@@ -9,17 +9,15 @@ from niclib.network.loss_functions import *
 
 class EarlyStoppingTrain:
     def __init__(self, loss_func, optimizer, batch_size, max_epochs=100, eval_metrics=None, early_stopping_metric='loss',
-                 early_stopping_patience=1, print_interval=5):
-        # Training variables # TODO put device as option
-        self.device = torch.device('cuda')
-
+                 early_stopping_patience=1, print_interval=5, device=torch.device('cuda')):
         # Training config
+        self.device = device
         self.bs = batch_size
         self.optimizer_obj = optimizer
         self.train_loss_func = loss_func
         self.max_epochs = max_epochs
 
-        # Test config
+        # Testing config
         self.eval_functions = {'loss': loss_func}
         if eval_metrics is not None:
             self.eval_functions.update(eval_metrics)
@@ -49,9 +47,8 @@ class EarlyStoppingTrain:
 
             monitored_metric_value = epoch_test_metrics[self.early_stopping_metric]
             if monitored_metric_value < best_metric['value']:
-                best_metric.update(epoch=self.current_epoch, value=monitored_metric_value)
                 print(' (best)', sep='')
-
+                best_metric.update(epoch=self.current_epoch, value=monitored_metric_value)
                 torch.save(model, checkpoint_filepath)
             else:
                 print('')
@@ -59,6 +56,27 @@ class EarlyStoppingTrain:
             if self.current_epoch - best_metric['epoch'] >= self.patience:
                 print("Training finished\n")
                 break
+
+    def train_epoch(self, model, optimizer, train_gen):
+        model.train()
+
+        avg_loss = 0
+        for batch_idx, (x, y) in enumerate(train_gen):
+            x, y = x.to(self.device), y.to(self.device)
+
+            y_pred = model(x)
+            loss = self.train_loss_func(y_pred, y)
+            avg_loss += loss.item()
+
+            optimizer.zero_grad()  # Reset accumulated gradients
+            loss.backward()  # Auto gradient loss
+            optimizer.step()  # Backpropagate the loss
+
+            if batch_idx % self.print_interval is 0:
+                self._printProgress(batch_idx, len(train_gen), self.current_epoch, 'train', loss.item())
+
+        self._printProgress(len(train_gen), len(train_gen), self.current_epoch, 'train',
+                            avg_loss / len(train_gen))
 
     def test_epoch(self, model, val_gen):
         model.eval()
@@ -82,27 +100,6 @@ class EarlyStoppingTrain:
             print(' - {}val_{}={:.4f}'.format(indicator, k, v), end='')
 
         return test_metrics
-
-    def train_epoch(self, model, optimizer, train_gen):
-        model.train()
-
-        avg_loss = 0
-        for batch_idx, (x, y) in enumerate(train_gen):
-            x, y = x.to(self.device), y.to(self.device)
-
-            y_pred = model(x)
-            loss = self.train_loss_func(y_pred, y)
-            avg_loss += loss.item()
-
-            optimizer.zero_grad()  # Reset accumulated gradients
-            loss.backward()  # Auto gradient loss
-            optimizer.step()  # Backpropagate the loss
-
-            if batch_idx % self.print_interval is 0:
-                self._printProgress(batch_idx, len(train_gen), self.current_epoch, 'train', loss.item())
-
-        self._printProgress(len(train_gen), len(train_gen), self.current_epoch, 'train',
-                            avg_loss / len(train_gen))
 
     def _printProgress(self, batch_num, total_batches, epoch_num, phase, loss):
         length, fill = 30, '='
