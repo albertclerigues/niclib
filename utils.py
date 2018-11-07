@@ -4,12 +4,19 @@ import cv2
 import sys
 
 
-def get_crossval_indexes(images, fold_idx, num_folds, images_per_fold):
-    assert num_folds * images_per_fold >= len(images), "Not enough images for this crossvalidation"
-    assert fold_idx < num_folds, "Impossible fold idx"
+def get_crossval_indexes(images, fold_idx, num_folds):
+    assert 0 <= fold_idx < num_folds, "Fold idx out of bounds"
 
+    images_per_fold = math.ceil(len(images) / num_folds)
     start_idx = fold_idx * images_per_fold
-    stop_idx = (fold_idx + 1) * images_per_fold
+    stop_idx = min((fold_idx + 1) * images_per_fold, len(images))
+
+    return start_idx, stop_idx
+
+def get_val_split_indexes(images, split_ratio=0.2):
+    start_idx = 0
+    stop_idx = math.ceil(len(images) * split_ratio)
+    assert stop_idx < len(images)
 
     return start_idx, stop_idx
 

@@ -4,7 +4,7 @@ from niclib.patch.slices import *
 from abc import ABC, abstractmethod
 
 
-class Sampler(ABC):
+class NICSampler(ABC):
     @abstractmethod
     def get_default_options(self):
         pass
@@ -14,7 +14,7 @@ class Sampler(ABC):
         pass
 
 
-class HybridLesionSampling(Sampler):
+class HybridLesionSampling(NICSampler):
     def __init__(self, in_shape, num_min_max_lesion, num_min_max_uniform, max_offset=None):
         self.in_shape = in_shape
         self.num_lesion = num_min_max_lesion
@@ -48,7 +48,7 @@ class HybridLesionSampling(Sampler):
 
         return pos_centers, unif_centers
 
-class UniformSampling(Sampler):
+class UniformSampling(NICSampler):
     def __init__(self, in_shape, extraction_step):
         self.in_shape = in_shape
         self.extraction_step = extraction_step

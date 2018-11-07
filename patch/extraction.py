@@ -3,30 +3,24 @@ import itertools as iter
 from niclib.patch.centers import *
 from niclib.patch.instructions import *
 from niclib.patch.slices import *
-from niclib.patch.sampling import HybridLesionSampling, UniformSampling
+from niclib.patch.sampling import *
 from niclib.io.terminal import printProgressBar
 
-def build_set_extraction_instructions(images, in_shape, out_shape, sampling, sampling_options, augment_to=None):
-    assert sampling in {'uniform', 'hybrid'}
-
-    if sampling is 'hybrid':
-        sampler = HybridLesionSampling(in_shape, **sampling_options)
-    elif sampling is 'uniform':
-        sampler = UniformSampling(in_shape, **sampling_options)
-    else:
-        raise (ValueError, 'Specified sampling doesn\'t exist')
+def build_set_extraction_instructions(images, in_shape, out_shape, sampler, augment_to=None):
+    assert isinstance(sampler, NICSampler)
 
     set_instructions = []
     for idx, image in enumerate(images):
         printProgressBar(idx, len(images), suffix='samples processed')
 
-        if sampling in {'hybrid'}: # Sampling that have two sets of centers
-            pos_centers, unif_centers = sampler.get_centers(image)
+        centers = sampler.get_centers(image)
+
+        if isinstance(centers, tuple): # Sampling that have two sets of centers
+            pos_centers, unif_centers = centers
             pos_instructions = get_instructions_from_centers(idx, pos_centers, in_shape, out_shape, augment_to=augment_to)
             unif_instructions = get_instructions_from_centers(idx, unif_centers, in_shape, out_shape, augment_to=None)
             image_instructions = pos_instructions + unif_instructions
         else:
-            centers = sampler.get_centers(image)
             image_instructions = get_instructions_from_centers(idx, centers, in_shape, out_shape, augment_to=augment_to)
 
         set_instructions += image_instructions
