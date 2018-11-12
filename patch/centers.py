@@ -17,7 +17,7 @@ def sample_uniform_patch_centers(patch_shape, extraction_step, volume_foreground
     volume_foreground = sample.data, is used to avoid adding centers for which the center of the patch is empty
     this is especially useful for not dense networks like HAVAEI or VALVERDE
     """
-    expected_shape = volume_foreground.shape[1:]
+    expected_shape = volume_foreground.shape
 
     assert len(patch_shape) == len(extraction_step) == len(expected_shape) == 3
 
@@ -35,9 +35,8 @@ def sample_uniform_patch_centers(patch_shape, extraction_step, volume_foreground
 
     # Make sure added center is foreground
     added_centers = 0
-
     for count, center_coords in enumerate(iter.product(*idxs)):
-        if volume_foreground[0, center_coords[0], center_coords[1], center_coords[2]] != 0:
+        if volume_foreground[center_coords[0], center_coords[1], center_coords[2]] != 0:
             centers[added_centers] = np.asarray(center_coords)
             added_centers += 1
 
@@ -63,7 +62,7 @@ def sample_positive_patch_centers(labels_volume):
     return centers
 
 
-def randomly_offset_centers(centers, offset_shape, patch_shape, original_vol):
+def randomly_offset_centers(centers, offset_shape, patch_shape, vol_foreground):
     ### Offset patches to avoid location bias
 
     # Create offset matrix
@@ -77,7 +76,7 @@ def randomly_offset_centers(centers, offset_shape, patch_shape, original_vol):
     centers += center_offsets
 
     # Check centers in-bounds
-    centers = clip_centers_out_of_bounds(centers, patch_shape, original_vol)
+    centers = clip_centers_out_of_bounds(centers, patch_shape, vol_foreground)
 
     return centers
 
@@ -99,23 +98,24 @@ def resample_centers(centers, min_samples=None, max_samples=None):
 
     return centers
 
-def clip_centers_out_of_bounds(centers, patch_shape, original_vol):
-    vol_shape = original_vol.shape[1:] # Omit modality dimension
+def clip_centers_out_of_bounds(centers, patch_shape, vol_foreground):
+    vol_shape = vol_foreground.shape
     center_range = [[(patch_shape[0] // 2) + 1, vol_shape[0] - (patch_shape[0] // 2) - 1],
                     [(patch_shape[1] // 2) + 1, vol_shape[1] - (patch_shape[1] // 2) - 1],
                     [(patch_shape[2] // 2) + 1, vol_shape[2] - (patch_shape[2] // 2) - 1]]
     center_range = np.asarray(center_range, dtype='int')
 
+    #print(centers.shape, vol_shape, center_range)
     for i in [0,1,2]:
         centers[:, i] = np.clip(centers[:, i], a_min=center_range[i][0], a_max=center_range[i][1])
 
-    """
-    print(vol_shape, center_range[0], center_range[1], center_range[2])
+    #print(vol_shape, center_range[0], center_range[1], center_range[2])
     for center in centers:
         if center[0] < center_range[0][0] or center[0] > center_range[0][1] or \
             center[1] < center_range[1][0] or center[1] > center_range[1][1] or \
             center[2] < center_range[2][0] or center[2] > center_range[2][1]:
             print('AHAA!', center)
-    """
+            raise ValueError
+
 
     return centers

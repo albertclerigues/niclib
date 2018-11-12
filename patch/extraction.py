@@ -6,27 +6,33 @@ from niclib.patch.slices import *
 from niclib.patch.sampling import *
 from niclib.io.terminal import printProgressBar
 
+# TODO change idx for id
+
+def build_sample_extraction_instructions(image, in_shape, out_shape, sampler, augment_to=None, idx=None):
+    centers = sampler.get_centers(image)
+
+    if isinstance(centers, tuple):  # Sampling that have two sets of centers
+        pos_centers, unif_centers = centers
+        pos_instructions = get_instructions_from_centers(idx, pos_centers, in_shape, out_shape, augment_to=augment_to)
+        unif_instructions = get_instructions_from_centers(idx, unif_centers, in_shape, out_shape, augment_to=None)
+        image_instructions = pos_instructions + unif_instructions
+    else:
+        image_instructions = get_instructions_from_centers(idx, centers, in_shape, out_shape, augment_to=augment_to)
+
+    return image_instructions
+
 def build_set_extraction_instructions(images, in_shape, out_shape, sampler, augment_to=None):
     assert isinstance(sampler, NICSampler)
 
     set_instructions = []
     for idx, image in enumerate(images):
         printProgressBar(idx, len(images), suffix='samples processed')
-
-        centers = sampler.get_centers(image)
-
-        if isinstance(centers, tuple): # Sampling that have two sets of centers
-            pos_centers, unif_centers = centers
-            pos_instructions = get_instructions_from_centers(idx, pos_centers, in_shape, out_shape, augment_to=augment_to)
-            unif_instructions = get_instructions_from_centers(idx, unif_centers, in_shape, out_shape, augment_to=None)
-            image_instructions = pos_instructions + unif_instructions
-        else:
-            image_instructions = get_instructions_from_centers(idx, centers, in_shape, out_shape, augment_to=augment_to)
-
+        image_instructions = build_sample_extraction_instructions(image, in_shape, out_shape, sampler, augment_to, idx=idx)
         set_instructions += image_instructions
-
     printProgressBar(len(images), len(images), suffix='samples processed')
+
     return set_instructions
+
 
 def get_instructions_from_centers(sample_idx, centers, patch_shape, output_shape, augment_to=None):
     data_slices = get_patch_slices(centers, patch_shape)

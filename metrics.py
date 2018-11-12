@@ -89,7 +89,17 @@ def dice_coef(y_true, y_pred, smooth = 0.01):
     else:
         return 0.0
 
+def compute_avg_std_metrics_list(metrics_list):
+    metrics_avg_std = dict()
 
+    for metric_name in metrics_list[0].keys():
+        metric_values = [metrics[metric_name] for metrics in metrics_list]
+
+        metrics_avg_std.update({
+            '{}_avg'.format(metric_name): np.mean(metric_values),
+            '{}_std'.format(metric_name): np.std(metric_values)})
+
+    return  metrics_avg_std
 
 
 

@@ -49,7 +49,9 @@ class Isles2018(NICdataset):
                 else:
                     image_data[modalities.index(found_modality[0])] = vol
 
-            sample = NICimage(id=case_idx + 1, nib_file=nib_file, image_data=image_data, foreground=None, labels=labels)
+            sample = NICimage(id=case_idx + 1, nib_file=nib_file, image_data=image_data, foreground=(image_data[0] > 0), labels=labels)
+
+            #print(sample.foreground.shape)
             self.add_train(sample)
 
         # Testing loading

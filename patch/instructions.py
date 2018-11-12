@@ -40,7 +40,7 @@ def extract_patch_with_instruction(samples, instruction, normalise=True):
         data_patch = augment_func(data_patch)
         label_patch = augment_func(label_patch) if extract_label else None
 
-    return data_patch, label_patch
+    return np.ascontiguousarray(data_patch), np.ascontiguousarray(label_patch)
 
 
 def augment_instructions(original_instructions, goal_num_instructions):

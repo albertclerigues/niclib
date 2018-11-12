@@ -31,8 +31,6 @@ def dice_loss(y_pred, y_true):
     """
 
     smooth = 1.
-
-    # Cast to float and remove healthy class logits for predicted
     y_pred = y_pred[:, 1, :, :].float()
     y_true = y_true.float()
 
@@ -52,16 +50,18 @@ def dice(y_pred, y_true):
     This function assumes one-hot encoded ground truth (CATEGORICAL :D)
 
     :param y_pred: last dimension should have ``num_classes``
-    :param y: segmentation ground truth (encoded as a binary matrix)
+    :param y_true: segmentation ground truth (encoded as a binary matrix)
         last dimension should be ``num_classes``
-    :param weight_map:
     :return: ``1.0 - mean(Dice similarity per class)``
     """
+    # Cast to float and remove healthy class logits for predicted
+    y_pred = y_pred[:, 1, :, :].float()
+    y_true = y_true.float()
 
     # computing Dice over the spatial dimensions
     reduce_axes = list(range(len(y_pred.shape) - 1))
-    dice_numerator = 2.0 * torch.sum(y_pred * y, axis=reduce_axes)
-    dice_denominator = torch.sum(y_pred, axis=reduce_axes) + torch.sum(y, axis=reduce_axes)
+    dice_numerator = 2.0 * torch.sum(y_pred * y_true, dim=reduce_axes)
+    dice_denominator = torch.sum(y_pred, dim=reduce_axes) + torch.sum(y_true, dim=reduce_axes)
 
     epsilon_denominator = 0.0001
     dice_score = dice_numerator / (dice_denominator + epsilon_denominator)
