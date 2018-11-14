@@ -14,7 +14,7 @@ from niclib.io.metrics import print_metrics_list
 
 
 class SimpleCrossvalidation:
-    def __init__(self, model_definition, images, num_folds, model_trainer, train_instr_gen, val_instr_gen, checkpoint_pathfile, test_predictor, test_binarizer, results_path):
+    def __init__(self, model_definition, images, num_folds, model_trainer, train_instr_gen, val_instr_gen, checkpoint_pathfile, log_pathfile, test_predictor, test_binarizer, results_path):
         assert isinstance(model_trainer, EarlyStoppingTrain)  # TODO make abstract trainer class
         assert isinstance(train_instr_gen, InstructionGenerator)
         assert isinstance(val_instr_gen, InstructionGenerator)
@@ -22,9 +22,14 @@ class SimpleCrossvalidation:
         self.model_definition = model_definition
         self.images = images
         self.num_folds = num_folds
+
         if checkpoint_pathfile.endswith('.pt'):
             checkpoint_pathfile, _ = os.path.splitext(checkpoint_pathfile)
         self.checkpoint_pathfile = checkpoint_pathfile + '_{}_to_{}.pt'
+
+        if log_pathfile.endswith('.csv'):
+            log_pathfile, _ = os.path.splitext(log_pathfile)
+        self.log_pathfile = log_pathfile + '_{}_to_{}.csv'
 
         self.trainer = model_trainer
         self.train_instr_gen = train_instr_gen
@@ -44,7 +49,7 @@ class SimpleCrossvalidation:
             start_idx_val, stop_idx_val = get_crossval_indexes(
                 images=self.images, fold_idx=fold_idx, num_folds=self.num_folds)
 
-            print("\n  Running fold {} - val images {} to {} \n".format(fold_idx, start_idx_val, stop_idx_val), sep='')
+            print("\n" + "-" * 50 +"\n Running fold {} - val images {} to {} \n".format(fold_idx, start_idx_val, stop_idx_val) + "-" * 50 + "\n", sep='')
 
             model_fold = copy.deepcopy(self.model_definition)
             train_images = self.images[:start_idx_val] + self.images[stop_idx_val:]
@@ -58,7 +63,8 @@ class SimpleCrossvalidation:
                 len(train_gen)*self.trainer.bs, len(val_gen)*self.trainer.bs))
 
             model_filepath =  self.checkpoint_pathfile.format(start_idx_val, stop_idx_val)
-            self.trainer.train(model_fold, train_gen, val_gen, model_filepath)
+            log_filepath = self.log_pathfile.format(start_idx_val, stop_idx_val)
+            self.trainer.train(model_fold, train_gen, val_gen, model_filepath, log_filepath)
 
             print("Loading trained model {}".format(model_filepath))
             model_fold = torch.load(model_filepath, self.trainer.device)

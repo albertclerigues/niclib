@@ -1,7 +1,16 @@
 import numpy as np
 import torch
 
-# TODO implement as abstract NICexperiment class
+class NICExperiment:
+    def __init__(self, name, run):
+        self.exp_name = name
+        self.run_name = run
+
+        self.checkpoints_dir = 'checkpoints/'
+        self.log_dir = 'log/'
+        self.results_dir = 'results/'
+        self.metrics_dir = 'metrics/'
+
 class ExperimentManager:
     def __init__(self, experiment_name, checkpoints_dir='checkpoints/', log_dir='log/', results_dir='results/', metrics_dir='metrics/'):
         self.experiment_name = experiment_name
@@ -16,3 +25,4 @@ class ExperimentManager:
         torch.manual_seed(0)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
+

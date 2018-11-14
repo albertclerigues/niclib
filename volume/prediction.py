@@ -7,6 +7,8 @@ from niclib.dataset.NICdataset import NICimage
 from niclib.network.generator import InstructionGenerator
 from niclib.patch.instructions import PatchExtractInstruction
 
+from niclib.volume import zeropad_sample, remove_zeropad_volume
+
 from niclib.io.terminal import printProgressBar
 
 class Predictor(ABC):
@@ -27,9 +29,11 @@ class PatchPredictor(Predictor):
         self.lesion_class = lesion_class
         self.device = device
 
-    def predict_sample(self, model, sample):
-        assert isinstance(sample, NICimage)
-        print("Predicting sample with id:{}".format(sample.id))
+    def predict_sample(self, model, sample_in):
+        assert isinstance(sample_in, NICimage)
+        print("Predicting sample with id:{}".format(sample_in.id))
+
+        sample = zeropad_sample(sample_in, self.instr_gen.in_shape)
 
         batch_size = self.instr_gen.bs
         sample_generator, instructions = self.instr_gen.build_patch_generator(sample, return_instructions=True)
@@ -63,6 +67,10 @@ class PatchPredictor(Predictor):
 
         if self.lesion_class is not None:
             volume_probs = volume_probs[self.lesion_class]
+
+        volume_probs = remove_zeropad_volume(volume_probs, self.instr_gen.in_shape)
+
+        assert np.array_equal(volume_probs.shape, sample_in.foreground.shape), (volume_probs.shape, sample_in.foreground.shape)
 
         return volume_probs
 

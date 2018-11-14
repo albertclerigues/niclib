@@ -22,6 +22,9 @@ def thresh_size_search(result_set, images, thresholds, lesion_sizes, compute_les
     for sample_num, (lesion_probs, true_vol) in enumerate(zip(result_set, ground_truth_set)):
         printProgressBar(sample_num, len(result_set), suffix=" samples processed")
 
+        if lesion_probs is None:
+            continue
+
         for thresh in thresholds:
             y_prob = lesion_probs > thresh
 

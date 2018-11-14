@@ -43,15 +43,17 @@ def load_result_set(result_path, original_images, filename_gen=None, result_type
     #assert isinstance(filename_gen, ResultFilenameGenerator)
 
     result_set = [None] * len(original_images)
+    results_found = 0
     for i, image in enumerate(original_images):
         # TODO use filename generators
         result_filename = "{}_{}.{}".format(image.id, result_type, file_format)
         result_pathfile = os.path.join(result_path, result_filename)
 
         if not os.path.isfile(result_pathfile):
-            warnings.warn("Didn't find result for image {}".format(image.id), RuntimeWarning)
             continue
 
+        results_found += 1
         result_set[i] = nib.load(result_pathfile).get_data()
 
+    print("Loaded result set with {} images out of {} possible ones".format(results_found, len(original_images)))
     return result_set

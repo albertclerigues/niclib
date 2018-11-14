@@ -8,16 +8,21 @@ from torch.utils.data import DataLoader as torchGenerator
 from niclib.patch.extraction import *
 from niclib.patch.instructions import extract_patch_with_instruction
 
+from niclib.volume import zeropad_set
 
 class InstructionGenerator:
-    def __init__(self, batch_size, in_shape, out_shape, sampler, augment_to=None, shuffle=False, num_workers=4):
+    def __init__(self, batch_size, in_shape, out_shape, sampler, augment_to=None, zeropad_images=False,shuffle=False, num_workers=4):
         self.bs = batch_size
         self.sampler = sampler
         self.in_shape, self.out_shape = in_shape, out_shape
         self.shuffle, self.num_workers = shuffle, num_workers
         self.augment_num = augment_to
+        self.zeropad = zeropad_images
 
     def build_patch_generator(self, images, return_instructions=False):
+        if self.zeropad:
+            images = zeropad_set(images, self.in_shape)
+
         if isinstance(images, list):
             instructions = build_set_extraction_instructions(images, self.in_shape, self.out_shape, self.sampler, self.augment_num)
         else:
@@ -44,6 +49,6 @@ class PatchSet(torchDataset):
     def __getitem__(self, index):
         'Generates one sample of data'
         x, y = extract_patch_with_instruction(self.images, self.instructions[index])
-        x, y = torch.from_numpy(x).float(), torch.from_numpy(np.squeeze(y, axis=0)).long()
+        x, y = torch.from_numpy(x).float(), torch.from_numpy(y.squeeze(axis=0)).long()
         return x, y
 

@@ -37,8 +37,7 @@ def extract_patch_with_instruction(samples, instruction, normalise=True):
     # Augment patches
     if instruction.augment_func is not None:
         augment_func = get_augment_functions(x_axis=1, y_axis=2)[instruction.augment_func]
-        data_patch = augment_func(data_patch)
-        label_patch = augment_func(label_patch) if extract_label else None
+        data_patch, label_patch = augment_func((data_patch, label_patch if extract_label else None))
 
     return np.ascontiguousarray(data_patch), np.ascontiguousarray(label_patch)
 
