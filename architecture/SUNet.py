@@ -4,8 +4,18 @@ import torch.nn.functional as F
 
 import numpy as np
 
-INIT_PRELU = 0.25
+INIT_PRELU = 0.0
 BN_MOMENTUM = 0.01
+
+def init_weights(m):
+    classname = m.__class__.__name__
+    if 'Conv' in classname:
+        nn.init.xavier_uniform_(m.weight)
+        nn.init.constant_(m.bias, 0)
+    elif 'BatchNorm' in classname:
+        nn.init.constant_(m.weight, 1)
+        nn.init.constant_(m.bias, 0)
+
 
 class SUNETx4(nn.Module):
     def __init__(self, in_ch=5, out_ch=2, nfilts=32, ndims=3):
@@ -18,7 +28,7 @@ class SUNETx4(nn.Module):
         self.dual1 = DualRes(1 * nfilts, ndims)
         self.dual2 = DualRes(2 * nfilts, ndims)
         self.dual3 = DualRes(4 * nfilts, ndims)
-        self.dual4 = DualRes(8 * nfilts, ndims, dropout_rate=0.2)
+        self.dual4 = DualRes(8 * nfilts, ndims, dropout_rate=0.1)
 
         self.down1 = DownStep(1 * nfilts, ndims)
         self.down2 = DownStep(2 * nfilts, ndims)
@@ -34,6 +44,8 @@ class SUNETx4(nn.Module):
 
         self.outconv = Conv(nfilts, out_ch, 3, padding=1)
         self.softmax = nn.Softmax(dim=1) # Channels dimension
+
+        self.apply(init_weights)
 
     def forward(self, x_in):
         l1_start = self.inconv(x_in)
@@ -62,8 +74,6 @@ class SUNETx4(nn.Module):
         r1_end = self.mono1(r1_start)
 
         pred = self.outconv(r1_end)
-
-        #if not self.training:
         pred = self.softmax(pred)
 
         return pred
@@ -80,7 +90,7 @@ class SUNETx5(nn.Module):
         self.dual2 = DualRes(2 * nfilts, ndims)
         self.dual3 = DualRes(4 * nfilts, ndims)
         self.dual4 = DualRes(8 * nfilts, ndims)
-        self.dual5 = DualRes(16 * nfilts, ndims, dropout_rate=0.2)
+        self.dual5 = DualRes(16 * nfilts, ndims, dropout_rate=0.1)
 
         self.down1 = DownStep(1 * nfilts, ndims)
         self.down2 = DownStep(2 * nfilts, ndims)
@@ -99,6 +109,8 @@ class SUNETx5(nn.Module):
 
         self.outconv = Conv(nfilts, out_ch, 3, padding=1)
         self.softmax = nn.Softmax(dim=1) # Channels dimension
+
+        self.apply(init_weights)
 
     def forward(self, x_in):
         l1_start = self.inconv(x_in)
@@ -147,11 +159,11 @@ class DualRes(nn.Module):
         Dropout = nn.Dropout2d if ndims is 2 else nn.Dropout3d
 
         self.conv_path = nn.Sequential(
-            BatchNorm(num_ch, momentum=BN_MOMENTUM),
+            BatchNorm(num_ch, momentum=BN_MOMENTUM, eps=0.001),
             nn.PReLU(num_ch, init=INIT_PRELU),
             Conv(num_ch, num_ch, 3, padding=1),
             Dropout(p=dropout_rate),
-            BatchNorm(num_ch, momentum=BN_MOMENTUM),
+            BatchNorm(num_ch, momentum=BN_MOMENTUM, eps=0.001),
             nn.PReLU(num_ch, init=INIT_PRELU),
             Conv(num_ch, num_ch, 3, padding=1))
 
@@ -167,7 +179,7 @@ class MonoRes(nn.Module):
         Conv = nn.Conv2d if ndims is 2 else nn.Conv3d
         BatchNorm = nn.BatchNorm2d if ndims is 2 else nn.BatchNorm3d
         self.conv_path = nn.Sequential(
-            BatchNorm(num_ch, momentum=BN_MOMENTUM),
+            BatchNorm(num_ch, momentum=BN_MOMENTUM, eps=0.001),
             nn.PReLU(num_ch, init=INIT_PRELU),
             Conv(num_ch, num_ch, 3, padding=1))
 
@@ -186,7 +198,7 @@ class DownStep(nn.Module):
         Conv = nn.Conv2d if ndims is 2 else nn.Conv3d
         BatchNorm = nn.BatchNorm2d if ndims is 2 else nn.BatchNorm3d
         self.conv_path = nn.Sequential(
-            BatchNorm(in_ch, momentum=BN_MOMENTUM),
+            BatchNorm(in_ch, momentum=BN_MOMENTUM, eps=0.001),
             nn.PReLU(in_ch, init=INIT_PRELU),
             Conv(in_ch, in_ch, 3, padding=1, stride=2))
 

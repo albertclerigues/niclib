@@ -1,6 +1,8 @@
 from niclib.patch.centers import *
 from niclib.patch.slices import *
 
+from niclib.utils import get_resampling_indexes
+
 from abc import ABC, abstractmethod
 
 
@@ -43,10 +45,16 @@ class HybridLesionSampling(NICSampler):
 
 
 class UniformSampling(NICSampler):
-    def __init__(self, in_shape, extraction_step=(1, 1, 1)):
+    def __init__(self, in_shape, extraction_step=(1, 1, 1), max_patches=None):
         self.in_shape = in_shape
         self.extraction_step = extraction_step
+        self.max_patches = max_patches
 
     def get_centers(self, image):
         unif_centers = sample_uniform_patch_centers(self.in_shape, self.extraction_step, image.foreground)
+
+        if self.max_patches is not None:
+            idxs = get_resampling_indexes(len(unif_centers), self.max_patches)
+            unif_centers = unif_centers[idxs]
+
         return unif_centers

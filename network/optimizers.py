@@ -10,7 +10,7 @@ class TorchOptimizer(NICOptimizer):
     """
     Wrapper for configuring default torch optimizers before assigning model parameters to optimize
     """
-    def __init__(self, optim_class, opts):
+    def __init__(self, optim_class, opts=None):
         self.optim_class = optim_class
         self.optim_options = opts
 

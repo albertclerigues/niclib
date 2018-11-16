@@ -1,6 +1,6 @@
 import numpy as np
 from scipy import ndimage
-from medpy.metric.binary import hd as haussdorf_dist
+from niclib.medpy_hausdorff import hd as haussdorf_dist
 
 def compute_confusion_matrix(y_true, y_pred):
     """
@@ -96,8 +96,8 @@ def compute_avg_std_metrics_list(metrics_list):
         metric_values = [metrics[metric_name] for metrics in metrics_list]
 
         metrics_avg_std.update({
-            '{}_avg'.format(metric_name): np.mean(metric_values),
-            '{}_std'.format(metric_name): np.std(metric_values)})
+            '{}_avg'.format(metric_name): np.nanmean(metric_values),
+            '{}_std'.format(metric_name): np.nanstd(metric_values)})
 
     return  metrics_avg_std
 

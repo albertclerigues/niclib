@@ -1,30 +1,43 @@
 import torch
 
+class NIC_crossentropy(torch.nn.Module):
+    def __init__(self, class_axis=1):
+        super(NIC_crossentropy, self).__init__()
+        self.class_axis = class_axis
+
+    def forward(self, y_pred, y_true):
+        """
+        From keras
+        """
+        # scale preds so that the class probs of each sample sum to 1
+        y_true_binary = torch.cat([torch.abs(y_true - 1), y_true], dim=1).float()
+
+        # manual computation of crossentropy
+        _epsilon = 1E-7
+        y_pred = torch.clamp(y_pred, _epsilon, 1. - _epsilon)
+
+        return torch.mean(-torch.sum(y_true_binary * torch.log(y_pred), dim=self.class_axis))
+
 
 def NIC_accuracy(y_pred, y_true, class_dim=1):
     """
     from Keras: K.mean(K.equal(K.argmax(y_true, axis=-1), K.argmax(y_pred, axis=-1)))
     """
-    y_true = y_true.long()
+    y_true = torch.squeeze(y_true.long(), dim=class_dim)
     y_pred_categorical = torch.argmax(y_pred, dim=class_dim)
     return torch.mean(torch.eq(y_true, y_pred_categorical).float())
 
-def NIC_crossentropy(output, y_true, class_axis=1):
-    # scale preds so that the class probs of each sample sum to 1
-    y_pred = output/torch.sum(output, dim=1, keepdim=True)
-    y_true_binary = torch.stack([torch.abs(y_true - 1), y_true], dim=1).float()
-
-    # manual computation of crossentropy
+def NIC_CrossentropyLoss(y_pred, y_true):
     _epsilon = 1E-7
     y_pred = torch.clamp(y_pred, _epsilon, 1. - _epsilon)
-
-    return torch.mean(-torch.sum(y_true_binary * torch.log(y_pred), dim=class_axis))
+    y_true = torch.squeeze(y_true, dim=1).long()
+    return torch.nn.CrossEntropyLoss()(y_pred, y_true)
 
 def NIC_BCELoss(y_pred, y_true):
     """
     Wrapper for torch BCELoss that adapts the shape and content
     """
-    y_true_binary = torch.stack([torch.abs(y_true - 1.0), y_true], dim=1).float()
+    y_true_binary = torch.cat([torch.abs(y_true - 1.0), y_true], dim=1).float()
     _epsilon = 1E-7
     y_pred = torch.clamp(y_pred, min=_epsilon, max=1.0 - _epsilon)
     return torch.nn.BCELoss()(y_pred, y_true_binary)
@@ -58,6 +71,8 @@ def dice_loss(y_pred, y_true, lesion_class=1):
     target: tensor with first dimension as batch
     """
 
+    raise NotImplementedError
+
     smooth = 0.0001
     y_pred = y_pred[:, lesion_class, ...].float()
     y_true = y_true.float()
@@ -83,10 +98,10 @@ def dice_dense(y_pred, y_true):
     """
 
     y_pred = y_pred.float()
-    y_true = torch.stack([torch.abs(y_true - 1), y_true], dim=1).float()
+    y_true = torch.cat([torch.abs(y_true - 1), y_true], dim=1).float()
 
     # computing Dice over the batch and spatial dimensions
-    reduce_dims = tuple([0,] + list(range(2, len(y_pred.shape))))
+    reduce_dims = tuple([0] + list(range(2, len(y_pred.shape))))
 
     dice_numerator = 2.0 * torch.sum(y_pred * y_true, dim=reduce_dims)
     dice_denominator = torch.sum(y_pred, dim=reduce_dims) + torch.sum(y_true, dim=reduce_dims)
@@ -95,34 +110,3 @@ def dice_dense(y_pred, y_true):
     dice_score = (dice_numerator + epsilon) / (dice_denominator + epsilon)
 
     return 1.0 - torch.mean(dice_score)
-
-
-def ss(y_pred, y_true, weight_map=None,r=0.05):
-    """
-    Function to calculate a multiple-ground_truth version of
-    the sensitivity-specificity loss defined in "Deep Convolutional
-    Encoder Networks for Multiple Sclerosis Lesion Segmentation",
-    Brosch et al, MICCAI 2015,
-    https://link.springer.com/chapter/10.1007/978-3-319-24574-4_1
-
-    error is the sum of r(specificity part) and (1-r)(sensitivity part)
-
-    :param prediction: the logits
-    :param ground_truth: segmentation ground_truth.
-    :param r: the 'sensitivity ratio'
-        (authors suggest values from 0.01-0.10 will have similar effects)
-    :return: the loss
-    """
-
-    # chosen region may contain no voxels of a given label. Prevents nans.
-    eps = 1e-5
-
-    y_true_f = y_true.view(-1)
-    y_pred_f = y_pred.view(-1)
-
-    sq_error = torch.pow(y_true_f - y_pred_f, 2)
-
-    spec_part = torch.sum(sq_error * y_true_f) / (torch.sum(y_true_f) + eps)
-    sens_part =  torch.sum(sq_error * (1 - y_true_f)) / (torch.sum(1 - y_true_f) + eps)
-
-    return r*spec_part + (1.0 - r)*sens_part

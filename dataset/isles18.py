@@ -7,6 +7,44 @@ from niclib.dataset.NICdataset import NICdataset, NICimage
 
 
 class Isles2018(NICdataset):
+
+    def __init__(self, dataset_path, num_volumes=(94, 0), modalities=('CT_SS', 'CT_CBF', 'CT_CBV', 'CT_MTT', 'CT_Tmax'), load_testing=True):
+        super().__init__()
+        dataset_path = os.path.expanduser(dataset_path)
+
+        print("Loading ISLES2018 dataset...")
+        pattern = ['training/case_{}/', 'testing/test_{}/{}.nii']
+        # Training loading
+        for case_idx in range(num_volumes[0]):
+            case_folder = os.path.join(dataset_path, pattern[0].format(str(case_idx + 1)))
+
+            initialized, image_data, labels, nib_nifty = False, None, None, None
+            for m_idx, modality in enumerate(modalities):
+                filepath = case_folder + '{}.nii'.format(modality)
+                nib_file = nib.load(filepath)
+                vol = nib_file.get_data()
+
+                if not initialized:
+                    image_data = np.zeros((len(modalities),) + vol.shape)
+                    nib_nifty = nib_file
+                    labels = np.zeros((1,) + vol.shape)
+                    initialized = True
+                image_data[m_idx] = vol
+            labels[0] = nib.load(case_folder + 'OT.nii').get_data()
+
+            sample = NICimage(
+                sample_id=case_idx + 1,
+                nib_file=nib_nifty,
+                image_data=image_data,
+                foreground=(image_data[0] > 0.0),
+                labels=labels)
+            self.add_train(sample)
+
+        # Testing loading
+        if not load_testing:
+            return
+
+    """
     def __init__(self, dataset_path, num_volumes=(94, 0), load_testing=True):
         super().__init__()
         dataset_path = os.path.expanduser(dataset_path)
@@ -49,7 +87,7 @@ class Isles2018(NICdataset):
                 else:
                     image_data[modalities.index(found_modality[0])] = vol
 
-            sample = NICimage(id=case_idx + 1, nib_file=nib_file, image_data=image_data, foreground=(image_data[0] > 0.0), labels=labels)
+            sample = NICimage(sample_id=case_idx + 1, nib_file=nib_file, image_data=image_data, foreground=(image_data[0] > 0.0), labels=labels)
 
             #print(sample.foreground.shape)
             self.add_train(sample)
@@ -57,30 +95,31 @@ class Isles2018(NICdataset):
         # Testing loading
         if not load_testing:
             return
-
         """
-        for case_idx in range(num_volumes[1]):
-            # Check folder exists (some samples missing)
-            filename = dataset_path + pattern[1].format(str(case_idx + 1), modalities[0])
-            if not os.path.exists(filename):
-                log.debug("Skipping, data not found on {}".format(filename))
-                continue
 
-            sample = NICimage(id=case_idx + 1)
+    """
+    for case_idx in range(num_volumes[1]):
+        # Check folder exists (some samples missing)
+        filename = dataset_path + pattern[1].format(str(case_idx + 1), modalities[0])
+        if not os.path.exists(filename):
+            log.debug("Skipping, data not found on {}".format(filename))
+            continue
 
-            # Load volume to check dimensions (not the same for all train samples)
-            nib_file = nib.load(filename)
-            sample.set_nib_headers(nib_file)
+        sample = NICimage(id=case_idx + 1)
 
-            vol = sample.nib.get_data()
+        # Load volume to check dimensions (not the same for all train samples)
+        nib_file = nib.load(filename)
+        sample.set_nib_headers(nib_file)
 
-            sample.data = np.zeros((len(modalities),) + vol.shape)
+        vol = sample.nib.get_data()
 
-            # Load all modalities (except last which is gt segmentation) into last appended ndarray
-            sample.data[0] = vol
-            for i in range(1, len(modalities)):
-                sample.data[i] = nib.load(dataset_path + pattern[1].format(str(case_idx + 1), modalities[i])).get_data()
+        sample.data = np.zeros((len(modalities),) + vol.shape)
 
-            self.add_test(sample)
-        """
+        # Load all modalities (except last which is gt segmentation) into last appended ndarray
+        sample.data[0] = vol
+        for i in range(1, len(modalities)):
+            sample.data[i] = nib.load(dataset_path + pattern[1].format(str(case_idx + 1), modalities[i])).get_data()
+
+        self.add_test(sample)
+    """
 

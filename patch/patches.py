@@ -15,7 +15,7 @@ from niclib.utils import get_resampling_indexes
 def extract_patch_at(volume, patch_slice):
     assert volume.ndim == len(patch_slice)
 
-    patch_out = copy.copy(volume[patch_slice])
+    patch_out = copy.deepcopy(volume[patch_slice])
     if patch_out.shape[-1] == 1: # 2D/3D compatibility
         patch_out = patch_out.squeeze(axis=-1)
 

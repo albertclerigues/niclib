@@ -52,8 +52,9 @@ class SimpleValidation:
         train_gen = self.train_instr_gen.build_patch_generator(images=train_images)
         print("Building validation generator...")
         val_gen = self.val_instr_gen.build_patch_generator(images=val_images)
-        print("\nGenerators with {} training and {} validation patches".format(
+        print("Generators with {} training and {} validation patches".format(
             len(train_gen)*self.trainer.bs, len(val_gen)*self.trainer.bs))
+
 
         self.trainer.train(model_fold, train_gen, val_gen, self.checkpoint_pathfile, self.log_pathfile)
 
@@ -65,8 +66,9 @@ class SimpleValidation:
             probs = self.predictor.predict_sample(model_fold, sample)
             save_image_probs(self.results_path + '{}_probs.nii.gz'.format(sample.id), sample, probs)
 
-            seg = self.binarizer.binarize(probs)
-            save_image_seg(self.results_path + '{}_seg.nii.gz'.format(sample.id), sample, seg)
+            if self.binarizer is not None:
+                seg = self.binarizer.binarize(probs)
+                save_image_seg(self.results_path + '{}_seg.nii.gz'.format(sample.id), sample, seg)
 
-            metrics = compute_segmentation_metrics(sample.labels[0], seg)
-            print_metrics_list(metrics, [sample.id])
+                metrics = compute_segmentation_metrics(sample.labels[0], seg)
+                print_metrics_list(metrics, [sample.id])

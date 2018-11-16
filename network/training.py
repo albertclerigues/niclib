@@ -1,3 +1,4 @@
+import copy
 import os
 import sys
 import string
@@ -34,11 +35,11 @@ class EarlyStoppingTrain:
         self.train_logger = TrainingLogger()
 
         # Metrics
-        self.train_metric_funcs = {'loss': loss_func}
+        self.train_metric_funcs = {'loss': copy.copy(loss_func)}
         if train_metrics is not None:
             self.train_metric_funcs.update(train_metrics)
 
-        self.test_metric_funcs = {'loss': loss_func}
+        self.test_metric_funcs = {'loss': copy.copy(loss_func)}
         if eval_metrics is not None:
             self.test_metric_funcs.update(eval_metrics)
 
@@ -46,6 +47,7 @@ class EarlyStoppingTrain:
         # Early stopping config
         self.early_stopping_metric = 'val_loss' if early_stopping_metric is None else early_stopping_metric
         self.patience = early_stopping_patience
+        self.min_delta = 1E-4
 
         # Printing options
         self.print_interval = print_interval
@@ -66,11 +68,10 @@ class EarlyStoppingTrain:
             return
 
         print("Training model for {} epochs".format(self.max_epochs))
-
         model = model.to(self.device)
         model_optimizer = self.optimizer.set_parameters(model.parameters())
-        self.current_epoch = -1
 
+        self.current_epoch = -1
         best_metric = dict(epoch=-1, value=sys.float_info.max)
         for epoch_num in range(self.max_epochs):
             self.current_epoch += 1
@@ -84,9 +85,10 @@ class EarlyStoppingTrain:
             now = datetime.datetime.now()
             basic_params = {'Epoch': self.current_epoch, 'Date': now.strftime("%Y-%m-%d"), 'Time':now.strftime('%H:%M:%S')}
             self.train_logger.add_epoch_params({**basic_params, **epoch_train_metrics, **epoch_test_metrics})
+            self.train_logger.write_to_csv(log_filepath)
 
             monitored_metric_value = epoch_test_metrics['val_{}'.format(self.early_stopping_metric)]
-            if monitored_metric_value < best_metric['value']:
+            if best_metric['value'] - monitored_metric_value > self.min_delta:
                 print(' (best)', sep='')
                 best_metric.update(epoch=self.current_epoch, value=monitored_metric_value)
                 torch.save(model, checkpoint_filepath)
@@ -94,7 +96,6 @@ class EarlyStoppingTrain:
                 print('')
 
             if self.current_epoch - best_metric['epoch'] >= self.patience:
-                self.train_logger.write_to_csv(log_filepath)
                 print("Training finished\n")
                 break
 
@@ -110,18 +111,20 @@ class EarlyStoppingTrain:
 
         eta = ElapsedTimeEstimator(len(train_gen))
         for batch_idx, (x, y) in enumerate(train_gen):
+            optimizer.zero_grad()  # Reset accumulated gradients
+
             x, y = x.to(self.device), y.to(self.device)
             y_pred = model(x)
             loss = self.train_loss_func(y_pred, y)
 
-            optimizer.zero_grad()  # Reset accumulated gradients
             loss.backward()  # Auto gradient loss
             optimizer.step()  # Backpropagate the loss
 
             # Update training metrics
             for k, eval_func in self.train_metric_funcs.items():
-                train_metrics['train_{}'.format(k)] += eval_func(y_pred, y)
+                train_metrics['train_{}'.format(k)] += eval_func(y_pred, y).item()
 
+            # PRINTING LOGIC
             self.print_lock.acquire()
             if self.print_flag:
                 # Compute average metrics
@@ -129,19 +132,18 @@ class EarlyStoppingTrain:
                 for k, v in avg_metrics.items():
                     avg_metrics[k] = float(v.item() / (batch_idx + 1))
 
-                self._printProgressBar(batch_idx+1, len(train_gen), eta.update(batch_idx+1), avg_metrics)
+                self._printProgressBar(batch_idx, len(train_gen), eta.update(batch_idx + 1), avg_metrics)
 
-                self.print_timer, self.print_flag = threading.Timer(self.print_interval, self._setPrintFlag), False
+                self.print_flag, self.print_timer = False, threading.Timer(self.print_interval, self._setPrintFlag)
                 self.print_timer.start()
             self.print_lock.release()
         self.print_timer.cancel()
 
         avg_metrics = dict(train_metrics)
         for k, v in avg_metrics.items():
-            avg_metrics[k] = float(v.item() / (len(train_gen) + 1))
+            avg_metrics[k] = float(v.item() / len(train_gen))
 
         self._printProgressBar(len(train_gen), len(train_gen), eta.get_elapsed_time(), avg_metrics)
-
         return avg_metrics
 
     def test_epoch(self, model, val_gen):
@@ -165,7 +167,7 @@ class EarlyStoppingTrain:
 
         # Print average validation metrics at the end of the training bar
         for k, v in test_metrics.items():
-            indicator = '*' if self.early_stopping_metric is k else ''
+            indicator = '*' if 'val_{}'.format(self.early_stopping_metric) is k else ''
             print(' - {}{}={:0<6.4f}'.format(indicator, k, v), end='')
 
         return test_metrics
@@ -181,7 +183,7 @@ class EarlyStoppingTrain:
         filledLength = int(length * batch_num // total_batches)
         bar = fill * filledLength + '>' * min(length - filledLength, 1) + '.' * (length - filledLength - 1)
 
-        metrics_string = ' - '.join(['{}={:0<6.4}'.format(k, v) for k,v in metrics.items()])
+        metrics_string = ' - '.join(['{}={:0<6.4f}'.format(k, v) for k,v in metrics.items()])
 
         print('\r [{}] {}/{} ({}%) ETA {} - {}'.format(
             bar, batch_num, total_batches, percent, eta, metrics_string), end='')
@@ -189,33 +191,27 @@ class EarlyStoppingTrain:
 
 
 class ElapsedTimeEstimator:
-    def __init__(self, total_iters, update_weight=0.01):
+    def __init__(self, total_iters, update_weight=0.05):
         self.total_eta = None
-
         self.start_time = time.time()
-
-        self.last_iter = {'num': 0, 'time':time.time()}
         self.total_iters = total_iters
 
+        self.last_iter = {'num': 0, 'time': time.time()}
         self.update_weight = update_weight
 
     def update(self, current_iter_num):
-        current_eta = None
-        current_iter = {'num': current_iter_num, 'time':time.time()}
-
+        current_eta, current_iter = None, {'num': current_iter_num, 'time':time.time()}
         if current_iter['num'] > self.last_iter['num']:
             iters_between = current_iter['num'] - self.last_iter['num']
             time_between = current_iter['time'] - self.last_iter['time']
             current_eta = (time_between / iters_between) * (self.total_iters - current_iter['num'])
-
             if self.total_eta is None:
                 self.total_eta = current_eta
 
-            w = self.update_weight * 10.0 if current_iter['num'] < 0.05 * self.total_iters else self.update_weight
-            self.total_eta = (current_eta * w) + (self.total_eta * (1 - w))
+            w = self.update_weight
+            self.total_eta = (current_eta * w) + ((self.total_eta - time_between) * (1 - w))
 
         self.last_iter = current_iter
-
         # Return formatted eta in hours, minutes, seconds
         return self._format_time_interval(self.total_eta) if current_eta is not None else '?'
 

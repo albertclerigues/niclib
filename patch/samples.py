@@ -91,23 +91,3 @@ def normalise_sample(sample_in, mean=None, std=None):
     return sample_in
 
 
-def zeropad_set(samples_in, patch_shape):
-    samples_out = list()
-    for sample in samples_in:
-        samples_out.append(zeropad_sample(sample, patch_shape))
-    return samples_out
-
-
-def zeropad_sample(sample_in, patch_shape):
-    sample_in.data = pad_volume(sample_in.data, patch_shape)
-    try:
-        sample_in.labels = pad_volume(sample_in.labels, patch_shape)
-    except AttributeError:
-        pass  # Some test samples don't have labels
-    return sample_in
-
-
-
-
-
-

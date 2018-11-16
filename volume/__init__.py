@@ -1,5 +1,5 @@
 import copy
-
+import math
 import numpy as np
 
 def zeropad_set(samples_in, patch_shape):
@@ -21,14 +21,14 @@ def remove_zeropad_volume(volume, patch_shape):
     # Get padding amount per each dimension
     selection = []
     for dim_size in patch_shape:
-        slice_start = dim_size // 2
+        slice_start = int(math.ceil(dim_size / 2.0))
         slice_stop = -slice_start if slice_start != 0 else None
         selection += [slice(slice_start, slice_stop)]
     volume = volume[tuple(selection)]
     return volume
 
 def pad_volume(volume, patch_shape):
-    pad_size = [patch_dim // 2 for patch_dim in patch_shape]
+    pad_size = [int(math.ceil(patch_dim / 2.0)) for patch_dim in patch_shape]
     padding = [(pad_size[0], pad_size[0]), (pad_size[1], pad_size[1]), (pad_size[2], pad_size[2])]
     if len(volume.shape) == 4: # also includes modality
         padding = [(0,0)] + padding

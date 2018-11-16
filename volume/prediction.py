@@ -67,6 +67,8 @@ class PatchPredictor(Predictor):
 
         if self.lesion_class is not None:
             volume_probs = volume_probs[self.lesion_class]
+        else:
+            volume_probs = np.squeeze(volume_probs, axis=0)
 
         volume_probs = remove_zeropad_volume(volume_probs, self.instr_gen.in_shape)
 

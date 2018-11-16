@@ -6,7 +6,7 @@ def print_metrics_list(metrics_list, case_names=None):
     if case_names is None:
         case_names = range(len(metrics_list))
 
-    print("\n{:^40}".format("Metrics"))
+    #print("\n{:^40}".format("Metrics"))
     print("{:<16}".format('Sample'), end='')
     for metric_name, metric_value in sorted(metrics_list[0].items()):
         print("  {:>8}".format(metric_name), end='')
