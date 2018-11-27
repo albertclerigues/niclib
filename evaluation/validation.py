@@ -2,9 +2,9 @@ import torch
 import os
 import copy
 
-from niclib.network.loss_functions import dice_loss
 from niclib.network.training import EarlyStoppingTrain
 from niclib.network.generator import InstructionGenerator
+from niclib.postprocessing import NIC_Postprocessing
 
 from niclib.io.results import *
 from niclib.metrics import *
@@ -13,10 +13,12 @@ from niclib.utils import *
 from niclib.io.metrics import print_metrics_list
 
 class SimpleValidation:
-    def __init__(self, model_definition, images, split_ratio, model_trainer, train_instr_gen, val_instr_gen, checkpoint_pathfile, log_pathfile, test_predictor, test_binarizer, results_path):
+    def __init__(self, model_definition, images, split_ratio, model_trainer, train_instr_gen, val_instr_gen, checkpoint_pathfile, log_pathfile, test_predictor, test_binarizer, results_path, test_postproc=None):
         assert isinstance(model_trainer, EarlyStoppingTrain)  # TODO make abstract trainer class
         assert isinstance(train_instr_gen, InstructionGenerator)
         assert isinstance(val_instr_gen, InstructionGenerator)
+        if test_postproc is not None:
+            assert isinstance(test_postproc, NIC_Postprocessing)
 
         assert checkpoint_pathfile.endswith('.pt')
         assert log_pathfile.endswith('.csv')
@@ -33,6 +35,7 @@ class SimpleValidation:
         self.val_instr_gen = val_instr_gen
 
         self.predictor = test_predictor
+        self.postproc = test_postproc
         self.binarizer = test_binarizer
 
         if not os.path.exists(results_path):
@@ -42,7 +45,7 @@ class SimpleValidation:
     def run_eval(self):
         start_idx_val, stop_idx_val = get_val_split_indexes(images=self.images, split_ratio=self.split_ratio)
 
-        print("\n" + "=" * 75 +"\n Running eval on val images {} to {} \n".format(start_idx_val, stop_idx_val) + "=" * 75 + "\n", sep='')
+        print("\n" + "-" * 75 +"\n Running eval on val images {} to {} \n".format(start_idx_val, stop_idx_val) + "-" * 75 + "\n", sep='')
 
         model_fold = copy.deepcopy(self.model_definition)
         train_images = self.images[:start_idx_val] + self.images[stop_idx_val:]
@@ -55,7 +58,6 @@ class SimpleValidation:
         print("Generators with {} training and {} validation patches".format(
             len(train_gen)*self.trainer.bs, len(val_gen)*self.trainer.bs))
 
-
         self.trainer.train(model_fold, train_gen, val_gen, self.checkpoint_pathfile, self.log_pathfile)
 
         print("Loading trained model {}".format(self.checkpoint_pathfile))
@@ -64,6 +66,11 @@ class SimpleValidation:
         # Predict validation set
         for n, sample in enumerate(val_images):
             probs = self.predictor.predict_sample(model_fold, sample)
+
+            # TODO take postprocessing, binarization and storage logic OUT
+            if self.postproc is not None:
+                probs = self.postproc.postprocess(probs, params=(sample.statistics,))
+
             save_image_probs(self.results_path + '{}_probs.nii.gz'.format(sample.id), sample, probs)
 
             if self.binarizer is not None:

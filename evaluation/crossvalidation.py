@@ -2,7 +2,6 @@ import torch
 import os
 import copy
 
-from niclib.network.loss_functions import dice_loss
 from niclib.network.training import EarlyStoppingTrain
 from niclib.network.generator import InstructionGenerator
 
@@ -43,7 +42,7 @@ class SimpleCrossvalidation:
         self.results_path = results_path
 
     def run_crossval(self):
-        print("\n" + "=" * 75 + "\n Running {}-fold crossvalidation \n".format(self.num_folds) + "=" * 75 + "\n", sep='')
+        print("\n" + "-" * 75 + "\n Running {}-fold crossvalidation \n".format(self.num_folds) + "-" * 75 + "\n", sep='')
 
         metrics_names = []
         metrics_samples = []
@@ -78,18 +77,19 @@ class SimpleCrossvalidation:
                 probs = self.predictor.predict_sample(model_fold, sample)
 
                 # Post processing
-
                 save_image_probs(self.results_path + '{}_probs.nii.gz'.format(sample.id), sample, probs)
 
-                seg = self.binarizer.binarize(probs)
-                save_image_seg(self.results_path + '{}_seg.nii.gz'.format(sample.id), sample, seg)
+                if self.binarizer is not None:
+                    seg = self.binarizer.binarize(probs)
+                    #save_image_seg(self.results_path + '{}_seg.nii.gz'.format(sample.id), sample, seg)
 
-                metrics = compute_segmentation_metrics(sample.labels[0], seg)
+                    metrics = compute_segmentation_metrics(sample.labels[0], seg)
 
-                metrics_names.append(sample.id)
-                metrics_samples.append(metrics)
+                    metrics_names.append(sample.id)
+                    metrics_samples.append(metrics)
 
-                print_metrics_list(metrics, [sample.id])
+                    print_metrics_list(metrics, [sample.id])
 
-        print_metrics_list(metrics_samples, metrics_names)
-        print_metrics_list(compute_avg_std_metrics_list(metrics_samples))
+        if self.binarizer is not None:
+            print_metrics_list(metrics_samples, metrics_names)
+            print_metrics_list(compute_avg_std_metrics_list(metrics_samples))

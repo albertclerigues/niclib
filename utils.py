@@ -4,7 +4,13 @@ import cv2
 import sys
 import nibabel as nib
 import itertools as iter
+import datetime
     
+
+def get_formatted_timedate():
+    time_format = "%Y-%m-%d_%H:%M:%S"
+    return     datetime.datetime.now().strftime(time_format)
+
 
 def get_crossval_indexes(images, fold_idx, num_folds):
     assert 0 <= fold_idx < num_folds, "Fold idx out of bounds"
@@ -65,29 +71,25 @@ def normalize_and_save_patch(patch, filename):
 
 
 def store_batch(filename, x, y_in):
-    if y_in.ndim != x[0].ndim:
-        print("Detected categorical y {}".format(y_in.shape))
-        y = np.reshape(y_in[:, 0, ...], (len(y_in), 1, 24, 24, 1))
-    else:
-        y = y_in
+    y = y_in
 
-    cell_shape = (6 * 30, 6 * 30, 1)
+    cell_shape = (6 * 60, 6 * 60, 1)
 
     x_save = np.zeros(cell_shape)
     y_save = np.zeros(cell_shape)
 
-    patch_shape = (24, 24, 1)
-    modality_idx = 4
+    patch_shape = (56, 56, 1)
+    modality_idx = 0
 
     # 6*6
     for i, j in iter.product(range(0, 6), range(6)):
         idx = np.ravel_multi_index((i, j), (6, 6))
 
-        selection = [slice(i * 30, i * 30 + patch_shape[0]), slice(j * 30, j * 30 + patch_shape[1]), slice(None)]
+        selection = [slice(i * 60, i * 60 + patch_shape[0]), slice(j * 60, j * 60 + patch_shape[1]), slice(None)]
         x_save[selection] = np.expand_dims(x[idx, modality_idx], axis=-1)
 
-        selection = [slice(i * 30, i * 30 + patch_shape[0]), slice(j * 30, j * 30 + patch_shape[1]), slice(None)]
-        y_save[selection] = y[idx, 0]
+        selection = [slice(i * 60, i * 60 + patch_shape[0]), slice(j * 60, j * 60 + patch_shape[1]), slice(None)]
+        y_save[selection] = np.expand_dims(y[idx, 0], axis=-1)
 
 
     x_save = x_save - np.min(x_save)

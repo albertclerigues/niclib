@@ -1,25 +1,86 @@
 import torch
-
-class NIC_crossentropy(torch.nn.Module):
-    def __init__(self, class_axis=1):
-        super(NIC_crossentropy, self).__init__()
-        self.class_axis = class_axis
-
-    def forward(self, y_pred, y_true):
-        """
-        From keras
-        """
-        # scale preds so that the class probs of each sample sum to 1
-        y_true_binary = torch.cat([torch.abs(y_true - 1), y_true], dim=1).float()
-
-        # manual computation of crossentropy
-        _epsilon = 1E-7
-        y_pred = torch.clamp(y_pred, _epsilon, 1. - _epsilon)
-
-        return torch.mean(-torch.sum(y_true_binary * torch.log(y_pred), dim=self.class_axis))
+import torch.nn.functional as F
+from abc import ABC, abstractmethod
 
 
-def NIC_accuracy(y_pred, y_true, class_dim=1):
+class NIC_MSE_reg_l1_fft(torch.nn.Module):
+    def __init__(self, w_reg=1.0):
+        super().__init__()
+        self.mse = torch.nn.MSELoss()
+        self.w_reg = w_reg
+
+    def forward(self, output, target):
+        t_fft = torch.rfft(torch.round(output), len(output.shape) - 2, normalized=True)
+        l1 = torch.sum(torch.pow(torch.sum(torch.pow(t_fft, 2.0), dim=-1) , 0.5)) / output.numel()
+        return self.mse(output, target) + self.w_reg * l1
+
+class NIC_crossentropyloss(torch.nn.Module):
+    def __init__(self, weights=(0.5, 0.5), device=torch.device('cuda')):
+        super().__init__()
+        self.w = torch.tensor(weights).to(device)
+
+    def forward(self, output, target):
+        output = torch.log(torch.clamp(output, 1E-7, 1.0 - 1E-7))
+        target = torch.squeeze(target, dim=1).long()
+        return F.cross_entropy(output, target, weight=self.w)
+
+def nic_reg_l1_fft(output, target):
+    t_fft = torch.rfft(torch.round(output), len(output.shape) - 2, normalized=True)
+    l1 = torch.sum(torch.pow(torch.sum(torch.pow(t_fft, 2.0), dim=-1), 0.5)) / output.numel()
+    return l1
+
+def nic_binary_l1_er(y_pred, y_true):
+    """
+    Early stopping for ISLES 2018
+    """
+    return nic_binary_l1loss(y_pred, y_true) + nic_binary_error_rate(y_pred, y_true)
+
+def nic_binary_crossentropy(y_pred, y_true):
+    y_true_binary = torch.cat([torch.abs(y_true - 1), y_true], dim=1).float()
+    y_pred = torch.clamp(y_pred, 1E-7, 1. - 1E-7)
+    return torch.mean(-torch.sum(y_true_binary * torch.log(y_pred), dim=1))
+
+def nic_binary_hinge(y_pred, y_true):
+    y_true_binary = torch.cat([torch.abs(y_true - 1), y_true], dim=1).float()
+
+    pos = torch.sum(y_true_binary * y_pred, dim=1)
+    neg, _ = torch.max((1. - y_true_binary) * y_pred, dim=1)
+    hinge = torch.max(torch.zeros_like(pos), neg - pos + 1.0)
+    return torch.mean(hinge)
+
+def nic_binary_jaccard(y_pred, y_true, smooth=100.0):
+    y_true_binary = torch.cat([torch.abs(y_true - 1.0), y_true], dim=1).float()
+    y_pred = torch.clamp(y_pred, 1E-7, 1. - 1E-7)
+
+    intersection = torch.sum(torch.abs(y_true_binary * y_pred), dim=1)
+    sum_ = torch.sum(torch.abs(y_true_binary) + torch.abs(y_pred), dim=1)
+    jac = (intersection + smooth) / (sum_ - intersection + smooth)
+    return torch.mean(1.0 - jac) * smooth
+
+def nic_binary_kl_divergence(y_pred, y_true):
+    y_true_binary = torch.cat([torch.abs(y_true - 1.), y_true], dim=1).float()
+    y_pred = torch.log(torch.clamp(y_pred, 1E-7, 1. - 1E-7))
+    return F.kl_div(y_pred, y_true_binary)
+
+def nic_binary_mseloss(y_pred, y_true):
+    y_true_binary = torch.cat([torch.abs(y_true - 1.), y_true], dim=1).float()
+    y_pred = torch.clamp(y_pred, 1E-7, 1. - 1E-7)
+    return F.mse_loss(y_pred, y_true_binary, reduction='elementwise_mean')
+
+def nic_binary_l1loss(y_pred, y_true):
+    y_true_binary = torch.cat([torch.abs(y_true - 1.), y_true], dim=1).float()
+    y_pred = torch.clamp(y_pred, 1E-7, 1. - 1E-7)
+    return F.l1_loss(y_pred, y_true_binary, reduction='elementwise_mean')
+
+def nic_binary_bceloss(y_pred, y_true):
+    """
+    Wrapper for torch BCELoss that adapts the shape and content
+    """
+    y_true_binary = torch.cat([torch.abs(y_true - 1.0), y_true], dim=1).float()
+    y_pred = torch.clamp(y_pred, min=1E-7, max=1.0 - 1E-7)
+    return F.binary_cross_entropy(y_pred, y_true_binary, reduction='elementwise_mean')
+
+def nic_binary_accuracy(y_pred, y_true, class_dim=1):
     """
     from Keras: K.mean(K.equal(K.argmax(y_true, axis=-1), K.argmax(y_pred, axis=-1)))
     """
@@ -27,86 +88,140 @@ def NIC_accuracy(y_pred, y_true, class_dim=1):
     y_pred_categorical = torch.argmax(y_pred, dim=class_dim)
     return torch.mean(torch.eq(y_true, y_pred_categorical).float())
 
-def NIC_CrossentropyLoss(y_pred, y_true):
-    _epsilon = 1E-7
-    y_pred = torch.clamp(y_pred, _epsilon, 1. - _epsilon)
-    y_true = torch.squeeze(y_true, dim=1).long()
-    return torch.nn.CrossEntropyLoss()(y_pred, y_true)
+def nic_binary_error_rate(y_pred, y_true, class_dim=1):
+    return 1.0 - nic_binary_accuracy(y_pred, y_true, class_dim)
 
-def NIC_BCELoss(y_pred, y_true):
-    """
-    Wrapper for torch BCELoss that adapts the shape and content
-    """
-    y_true_binary = torch.cat([torch.abs(y_true - 1.0), y_true], dim=1).float()
-    _epsilon = 1E-7
-    y_pred = torch.clamp(y_pred, min=_epsilon, max=1.0 - _epsilon)
-    return torch.nn.BCELoss()(y_pred, y_true_binary)
+def nic_lesion_dice_loss(y_pred, y_true, smooth=100.0):
+    y_pred = y_pred[:, 1, ...].unsqueeze(1) # only lesion probabilities
 
+    dice_numerator = 2.0 * torch.sum(y_pred * y_true, dim=1)
+    dice_denominator = torch.sum(y_pred, dim=1) + torch.sum(y_true, dim=1)
+    dice_score = (dice_numerator + smooth) / (dice_denominator + smooth)
+    return torch.mean(1.0 - dice_score) * smooth
 
-def jaccard(y_pred, y_true, smooth=100.0):
-    """
-    Jaccard = (|X & Y|)/ (|X|+ |Y| - |X & Y|)
-            = sum(|A*B|)/(sum(|A|)+sum(|B|)-sum(|A*B|))
-
-    The jaccard distance loss is usefull for unbalanced datasets. This has been
-    shifted so it converges on 0 and is smoothed to avoid exploding or disapearing
-    gradient.
-
-    Ref: https://en.wikipedia.org/wiki/Jaccard_index
-
-    @url: https://gist.githuAdadeltab.com/wassname/f1452b748efcbeb4cb9b1d059dce6f96
-    @author: wassname
-    """
-    
-    intersection = torch.sum(torch.abs(y_true * y_pred), axis=-1)
-    sum_ = torch.sum(torch.abs(y_true) + torch.abs(y_pred), axis=-1)
-    jac = (intersection + smooth) / (sum_ - intersection + smooth)
-
-    return (1 - jac) * smooth
-
-def dice_loss(y_pred, y_true, lesion_class=1):
-    """This definition generalize to real valued pred and target vector.
-        This should be differentiable.
-    pred: tensor with first dimension as batch
-    target: tensor with first dimension as batch
-    """
-
-    raise NotImplementedError
-
-    smooth = 0.0001
-    y_pred = y_pred[:, lesion_class, ...].float()
-    y_true = y_true.float()
-
-    # have to use contiguous since they may from a torch.view op
-    iflat = y_pred.contiguous().view(-1)
-    tflat = y_true.contiguous().view(-1)
-    intersection = (iflat * tflat).sum()
-
-    A_sum = torch.sum(tflat * iflat)
-    B_sum = torch.sum(tflat * tflat)
-
-    return 1 - ((2. * intersection + smooth) / (A_sum + B_sum + smooth))
-
-def dice_dense(y_pred, y_true):
+def nic_binary_dice(output, target, smooth=100.0):
     """
     Computing mean-class Dice similarity.
-
-    :param y_pred: last dimension should have ``num_classes``
-    :param y_true: segmentation ground truth (encoded as a binary matrix)
-        last dimension should be ``num_classes``
-    :return: ``1.0 - mean(Dice similarity per class)``
     """
+    target = torch.cat([1.0 - target, target], dim=1).float()
+    dice_numerator = 2.0 * torch.sum(output * target, dim=1)
+    dice_denominator = torch.sum(output, dim=1) + torch.sum(target, dim=1)
+    dice_score = (dice_numerator + smooth) / (dice_denominator + smooth)
+    return torch.mean(1.0 - dice_score) * smooth
 
-    y_pred = y_pred.float()
-    y_true = torch.cat([torch.abs(y_true - 1), y_true], dim=1).float()
 
-    # computing Dice over the batch and spatial dimensions
-    reduce_dims = tuple([0] + list(range(2, len(y_pred.shape))))
+class NIC_binary_xent_gdl(torch.nn.Module):
+    def __init__(self, xent_weights=(0.5, 0.5), type_weight='Square', device=torch.device('cuda')):
+        super().__init__()
+        self.gdl = NIC_GDL(device=device, type_weight=type_weight)
+        self.xent = NIC_crossentropyloss(device=device, weights=xent_weights)
 
-    dice_numerator = 2.0 * torch.sum(y_pred * y_true, dim=reduce_dims)
-    dice_denominator = torch.sum(y_pred, dim=reduce_dims) + torch.sum(y_true, dim=reduce_dims)
+    def forward(self, output, target):
+        return self.gdl(output, target) + self.xent(output, target)
 
-    epsilon = 0.0001
-    dice_score = (dice_numerator + epsilon) / (dice_denominator + epsilon)
+class NIC_binary_xent_dice(torch.nn.Module):
+    def __init__(self, xent_weights=(0.5, 0.5), device=torch.device('cuda')):
+        super().__init__()
+        self.xent = NIC_crossentropyloss(device=device, weights=xent_weights)
 
-    return 1.0 - torch.mean(dice_score)
+    def forward(self, output, target):
+        return nic_binary_dice(output, target) + self.xent(output, target)
+
+class NIC_binary_exp_log_loss(torch.nn.Module):
+    def __init__(self, w_dice=0.8, w_cross=0.2, gamma=0.3):
+        super().__init__()
+        self.w_dice = w_dice
+        self.w_cross = w_cross
+        self.gamma = gamma
+
+    def forward(self, output_in, target_in):
+        target = torch.cat([1 - target_in, target_in], dim=1).float()
+        output = torch.clamp(output_in, min=1E-7, max=1.0 - 1E-7)
+
+        # Dice term
+        sum_dims = [0] + list(range(2, len(target.shape)))
+        dice = (2.0 * torch.sum(target * output, dim=sum_dims) + 1.0) / (torch.sum(target + output, dim=sum_dims) + 1.0)
+        Ldice = torch.mean(torch.pow(-torch.log(dice), self.gamma))
+
+        # Weighted crossentropy term
+        wl = torch.pow(torch.sum(target) / torch.sum(target, dim=[0] + list(range(2, len(target.shape)))), 0.5)
+        cross_0 = wl[0] * torch.pow(-torch.log(output[:, 0, ...]), self.gamma)
+        cross_1 = wl[1] * torch.pow(-torch.log(output[:, 1, ...]), self.gamma)
+        Lcross = torch.mean(cross_0 + cross_1)
+
+        return self.w_dice * Ldice + self.w_cross * Lcross
+
+
+
+class NIC_GDL(torch.nn.Module):
+    def __init__(self, device, type_weight='Square'):
+        super(NIC_GDL, self).__init__()
+        assert type_weight in {'Square', 'Simple', 'Uniform'}
+        self.device = device
+        self.wtype = type_weight
+
+    def forward(self, pred, gt, type_weight='Square'):
+        reduce_dims = (0, ) + tuple(range(2, len(gt.shape)))  # 0 and 1 are batch size
+        gt_binary = torch.cat([1.0 - gt, gt], dim=1).float()
+
+        # 1st compute weights
+        if self.wtype == 'Square':
+            weights = torch.reciprocal(torch.pow(torch.sum(gt_binary, dim=reduce_dims), 2.0))
+        elif self.wtype == 'Simple':
+            weights = torch.reciprocal(torch.sum(gt_binary, dim=reduce_dims))
+        elif self.wtype == 'Uniform':
+            weights = torch.ones_like(torch.sum(gt_binary, dim=reduce_dims))
+        else:
+            raise ValueError("The variable type_weight \"{}\" is not defined.".format(type_weight))
+        new_weights = torch.where(torch.isinf(weights), torch.zeros_like(weights), weights)
+        weights = torch.where(torch.isinf(weights), torch.ones_like(weights) * torch.max(new_weights), weights)
+
+        # Compute score
+        num = torch.sum(weights * torch.sum(torch.mul(pred, gt_binary), dim=reduce_dims))
+        den = torch.sum(weights * torch.sum(torch.add(pred, gt_binary), dim=reduce_dims))
+        gds = 2.0 * (num / den)
+        if torch.isnan(gds):
+            gds = torch.ones_like(gds)
+
+        # Return loss
+        return 1.0 - gds
+
+class NIC_binary_asymsimilarity_loss(torch.nn.Module):
+    def __init__(self, beta=1.5, device=torch.device('cuda')):
+        super().__init__()
+        self.b = torch.tensor(beta).to(device)
+
+    def forward(self, output, target):
+        target = torch.squeeze(target, dim=1)
+        output = torch.clamp(output[:, 1, ...], min=1E-7, max=1.0 - 1E-7)
+
+        b2, b2_1 = torch.pow(self.b, 2.0), torch.pow(self.b, 2.0) + 1.0
+
+        num = b2_1 * torch.sum(output * target) + 1.0
+        den = b2_1 * torch.sum(output * target) + b2 * torch.sum((1.0 - output) * target) + \
+              torch.sum(output * (1.0 - target)) + 1.0
+
+        return torch.div(num, den)
+
+class NIC_binary_focal_loss(torch.nn.Module):
+    def __init__(self, gamma=2., alpha=0.25):
+        """
+        Constructor for the binary focal loss
+        :param gamma:
+        :param alpha: alpha is weight for class 0 (background)
+        """
+        super().__init__()
+        self.g = gamma
+        self.a = alpha
+
+    def forward(self, y_pred, y_true):
+        y_true_bin = torch.cat([torch.abs(y_true - 1.0), y_true], dim=1).float()
+        y_pred = torch.clamp(y_pred, min=1E-7, max=1.0 - 1E-7)
+
+        mask0, mask1  = y_true_bin[:, 0, ...], y_true_bin[:, 1, ...] # background mask (is 1 if bg, 0 if fg)
+        s0, s1 = y_pred[:, 0, ...], y_pred[:, 1, ...] # s0 = 1 - s1
+
+        fl_0 = torch.mul(mask0, self.a * torch.pow(1. - s0, self.g) * torch.log(s0))
+        fl_1 = torch.mul(mask1, (1 - self.a) * torch.pow(1. - s1, self.g) * torch.log(s1))
+
+        return torch.mean(-1.0 * (fl_0 + fl_1))

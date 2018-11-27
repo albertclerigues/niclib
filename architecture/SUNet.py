@@ -18,7 +18,7 @@ def init_weights(m):
 
 
 class SUNETx4(nn.Module):
-    def __init__(self, in_ch=5, out_ch=2, nfilts=32, ndims=3):
+    def __init__(self, in_ch=5, out_ch=2, nfilts=32, ndims=3, softmax_out=True):
         super(SUNETx4, self).__init__()
         Conv = nn.Conv2d if ndims is 2 else nn.Conv3d
         ConvTranspose = nn.ConvTranspose2d if ndims is 2 else nn.ConvTranspose3d
@@ -43,9 +43,15 @@ class SUNETx4(nn.Module):
         self.up2 = ConvTranspose(in_channels=2 * nfilts, out_channels=1 * nfilts, kernel_size=3, padding=1, output_padding=1, stride=2)
 
         self.outconv = Conv(nfilts, out_ch, 3, padding=1)
+
+        self.do_softmax = softmax_out
         self.softmax = nn.Softmax(dim=1) # Channels dimension
 
         self.apply(init_weights)
+
+        model_parameters = filter(lambda p: p.requires_grad, self.parameters())
+        nparams = sum([np.prod(p.size()) for p in model_parameters])
+        print("SUNETx4 network with {} parameters".format(nparams))
 
     def forward(self, x_in):
         l1_start = self.inconv(x_in)
@@ -74,7 +80,8 @@ class SUNETx4(nn.Module):
         r1_end = self.mono1(r1_start)
 
         pred = self.outconv(r1_end)
-        pred = self.softmax(pred)
+        if self.do_softmax:
+            pred = self.softmax(pred)
 
         return pred
 

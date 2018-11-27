@@ -9,8 +9,11 @@ from niclib.volume.binarization import ThreshSizeBinarizer
 from niclib.io.terminal import printProgressBar
 
 def thresh_size_search_inefficient(result_set, images, thresholds, lesion_sizes, compute_lesion_metrics=False):
-    true_vols = [img.labels[0] for img in images]
-    prob_vols = [result_set[img.id] for img in images]
+
+    true_vols, prob_vols = [], []
+    for img in images:
+        true_vols.append(img.labels[0])
+        prob_vols.append(result_set[img.id] if img.id in result_set else None)
 
     # Generate result filename and try to load_samples results
     metrics_list = list()
@@ -21,7 +24,11 @@ def thresh_size_search_inefficient(result_set, images, thresholds, lesion_sizes,
 
         metrics_iter = list()
         for lesion_probs, true_vol in zip(prob_vols, true_vols):
-            rec_vol = ThreshSizeBinarizer(thresh, lesion_size).binarize(lesion_probs)
+            if lesion_probs is not None:
+                rec_vol = ThreshSizeBinarizer(thresh, lesion_size).binarize(lesion_probs)
+            else:
+                continue
+
             metrics_iter.append(
                 compute_segmentation_metrics(true_vol, rec_vol, lesion_metrics=compute_lesion_metrics))
 

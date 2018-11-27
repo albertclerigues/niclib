@@ -58,14 +58,13 @@ class EarlyStoppingTrain:
         self.print_lock = threading.Lock()
         self.print_timer = None
 
-        assert 0 < self.patience < self.max_epochs
         assert self.early_stopping_metric in self.test_metric_funcs.keys()
 
     def train(self, model, train_gen, val_gen, checkpoint_filepath, log_filepath):
         print("")
         if self.load_trained and os.path.exists(checkpoint_filepath):
-            print("Found trained model {}".format(checkpoint_filepath))
-            return
+            print("Resuming training from weights in: {}".format(checkpoint_filepath))
+            model = torch.load(checkpoint_filepath)
 
         print("Training model for {} epochs".format(self.max_epochs))
         model = model.to(self.device)
@@ -96,8 +95,9 @@ class EarlyStoppingTrain:
                 print('')
 
             if self.current_epoch - best_metric['epoch'] >= self.patience:
-                print("Training finished\n")
                 break
+
+        print("Training finished\n")
 
     def train_epoch(self, model, optimizer, train_gen):
         model.train()

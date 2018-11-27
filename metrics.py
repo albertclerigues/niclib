@@ -92,6 +92,8 @@ def dice_coef(y_true, y_pred, smooth = 0.01):
 def compute_avg_std_metrics_list(metrics_list):
     metrics_avg_std = dict()
 
+    assert len(metrics_list) > 0
+
     for metric_name in metrics_list[0].keys():
         metric_values = [metrics[metric_name] for metrics in metrics_list]
 
