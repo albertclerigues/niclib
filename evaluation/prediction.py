@@ -4,7 +4,7 @@ import torch
 import numpy as np
 
 from niclib.dataset.NICdataset import NICimage
-from niclib.network.generator import InstructionGenerator
+from niclib.network.generator import PatchGeneratorBuilder
 from niclib.patch.instructions import PatchExtractInstruction
 
 from niclib.volume import zeropad_sample, remove_zeropad_volume
@@ -21,13 +21,16 @@ class PatchPredictor(Predictor):
     Predicts a whole volume using patches with the provided model
     """
 
-    def __init__(self, instruction_generator, num_classes, lesion_class=None, device=torch.device('cuda')):
-        assert isinstance(instruction_generator, InstructionGenerator)
+    def __init__(self, instruction_generator, num_classes, uncertainty_dropout=0.0, uncertainty_passes=1, lesion_class=None, device=torch.device('cuda')):
+        assert isinstance(instruction_generator, PatchGeneratorBuilder)
         self.instr_gen = instruction_generator
 
         self.num_classes = num_classes
         self.lesion_class = lesion_class
         self.device = device
+
+        self.uncertainty_passes = uncertainty_passes
+        self.uncertainty_dropout = uncertainty_dropout
 
     def predict_sample(self, model, sample_in):
         assert isinstance(sample_in, NICimage)
@@ -43,13 +46,28 @@ class PatchPredictor(Predictor):
 
         model.eval()
         model.to(self.device)
+
+        if self.uncertainty_passes > 1:
+            try:
+                model.activate_dropout_testing(p_out=self.uncertainty_dropout)
+            except AttributeError as ae:
+                print(str(ae), "Dropout at test time not configured for this model")
+                self.uncertainty_passes = 1
+
         with torch.no_grad():  # Turns off autograd (faster exec)
             for batch_idx, (x, y) in enumerate(sample_generator):
                 printProgressBar(batch_idx, len(sample_generator), suffix=' patches predicted')
 
                 x, y = x.to(self.device), y.to(self.device)
-                y_pred = model(x).cpu().numpy()
 
+                y_pred = model(x)
+                if self.uncertainty_passes > 1:
+                    for i in range(1, self.uncertainty_passes):
+                        y_pred = y_pred + model(x)
+                    y_pred = y_pred / self.uncertainty_passes
+                    y_pred = torch.nn.functional.softmax(y_pred, dim=1)
+
+                y_pred = y_pred.cpu().numpy()
                 if len(y_pred.shape) == 4:  # Add third dimension to 2D patches
                     y_pred = np.expand_dims(y_pred, axis=-1)
 
@@ -61,6 +79,9 @@ class PatchPredictor(Predictor):
                     voting_img[patch_instruction.data_patch_slice] += patch_pred
                     counting_img[patch_instruction.data_patch_slice] += np.ones_like(patch_pred)
             printProgressBar(len(sample_generator), len(sample_generator), suffix=' patches predicted')
+
+        if self.uncertainty_passes > 1:
+            model.deactivate_dropout_testing()
 
         counting_img[counting_img == 0.0] = 1.0 # Avoid division by 0
         volume_probs = np.divide(voting_img, counting_img)

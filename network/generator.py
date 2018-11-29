@@ -10,7 +10,7 @@ from niclib.patch.instructions import extract_patch_with_instruction
 
 from niclib.volume import zeropad_set
 
-class InstructionGenerator:
+class PatchGeneratorBuilder:
     def __init__(self, batch_size, in_shape, out_shape, sampler, augment_to=None, autoencoder=False, autoencoder_noise=False, zeropad_images=False, shuffle=False, num_workers=4):
         self.bs = batch_size
         self.sampler = sampler

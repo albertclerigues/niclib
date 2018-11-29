@@ -3,7 +3,7 @@ import os
 import copy
 
 from niclib.network.training import EarlyStoppingTrain
-from niclib.network.generator import InstructionGenerator
+from niclib.network.generator import PatchGeneratorBuilder
 
 from niclib.io.results import *
 from niclib.metrics import *
@@ -13,10 +13,10 @@ from niclib.io.metrics import print_metrics_list
 
 
 class SimpleCrossvalidation:
-    def __init__(self, model_definition, images, num_folds, model_trainer, train_instr_gen, val_instr_gen, checkpoint_pathfile, log_pathfile, test_predictor, test_binarizer, results_path):
-        assert isinstance(model_trainer, EarlyStoppingTrain)  # TODO make abstract trainer class
-        assert isinstance(train_instr_gen, InstructionGenerator)
-        assert isinstance(val_instr_gen, InstructionGenerator)
+    def __init__(self, model_definition, images, num_folds, model_trainer, train_instr_gen, val_instr_gen, checkpoint_pathfile, log_pathfile, test_predictor, results_path):
+        assert isinstance(model_trainer, EarlyStoppingTrain)
+        assert isinstance(train_instr_gen, PatchGeneratorBuilder)
+        assert isinstance(val_instr_gen, PatchGeneratorBuilder)
 
         self.model_definition = model_definition
         self.images = images
@@ -35,8 +35,6 @@ class SimpleCrossvalidation:
         self.val_instr_gen = val_instr_gen
 
         self.predictor = test_predictor
-        self.binarizer = test_binarizer
-
         if not os.path.exists(results_path):
             os.mkdir(results_path)
         self.results_path = results_path
@@ -44,8 +42,6 @@ class SimpleCrossvalidation:
     def run_crossval(self):
         print("\n" + "-" * 75 + "\n Running {}-fold crossvalidation \n".format(self.num_folds) + "-" * 75 + "\n", sep='')
 
-        metrics_names = []
-        metrics_samples = []
 
         for fold_idx in range(self.num_folds):
             start_idx_val, stop_idx_val = get_crossval_indexes(
@@ -71,25 +67,7 @@ class SimpleCrossvalidation:
             print("Loading trained model {}".format(model_filepath))
             model_fold = torch.load(model_filepath, self.trainer.device)
 
-
             # Predict validation set
             for n, sample in enumerate(val_images):
                 probs = self.predictor.predict_sample(model_fold, sample)
-
-                # Post processing
                 save_image_probs(self.results_path + '{}_probs.nii.gz'.format(sample.id), sample, probs)
-
-                if self.binarizer is not None:
-                    seg = self.binarizer.binarize(probs)
-                    #save_image_seg(self.results_path + '{}_seg.nii.gz'.format(sample.id), sample, seg)
-
-                    metrics = compute_segmentation_metrics(sample.labels[0], seg)
-
-                    metrics_names.append(sample.id)
-                    metrics_samples.append(metrics)
-
-                    print_metrics_list(metrics, [sample.id])
-
-        if self.binarizer is not None:
-            print_metrics_list(metrics_samples, metrics_names)
-            print_metrics_list(compute_avg_std_metrics_list(metrics_samples))

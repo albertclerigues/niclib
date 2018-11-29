@@ -4,6 +4,8 @@ import torch.nn.functional as F
 
 import numpy as np
 
+from niclib.network.layers import DropoutPrediction
+
 INIT_PRELU = 0.0
 BN_MOMENTUM = 0.01
 
@@ -26,16 +28,16 @@ class SUNETx4(nn.Module):
         self.inconv = Conv(in_ch, 1 * nfilts, 3, padding=1)
 
         self.dual1 = DualRes(1 * nfilts, ndims)
-        self.dual2 = DualRes(2 * nfilts, ndims)
-        self.dual3 = DualRes(4 * nfilts, ndims)
-        self.dual4 = DualRes(8 * nfilts, ndims, dropout_rate=0.1)
+        self.dual2 = DualRes(2 * nfilts, ndims, dropout_prediction=True)
+        self.dual3 = DualRes(4 * nfilts, ndims, dropout_prediction=True)
+        self.dual4 = DualRes(8 * nfilts, ndims, dropout_rate=0.1, dropout_prediction=True)
 
         self.down1 = DownStep(1 * nfilts, ndims)
         self.down2 = DownStep(2 * nfilts, ndims)
         self.down3 = DownStep(4 * nfilts, ndims)
 
-        self.mono3 = MonoRes(4 * nfilts, ndims)
-        self.mono2 = MonoRes(2 * nfilts, ndims)
+        self.mono3 = MonoRes(4 * nfilts, ndims, dropout_prediction=True)
+        self.mono2 = MonoRes(2 * nfilts, ndims, dropout_prediction=True)
         self.mono1 = MonoRes(1 * nfilts, ndims)
 
         self.up4 = ConvTranspose(in_channels=8 * nfilts, out_channels=4 * nfilts, kernel_size=3, padding=1, output_padding=1, stride=2)
@@ -52,6 +54,18 @@ class SUNETx4(nn.Module):
         model_parameters = filter(lambda p: p.requires_grad, self.parameters())
         nparams = sum([np.prod(p.size()) for p in model_parameters])
         print("SUNETx4 network with {} parameters".format(nparams))
+
+    def activate_dropout_testing(self, p_out):
+        def activate_dropout(m):
+            if isinstance(m, DropoutPrediction):
+                m.activate(p_out)
+        self.apply(activate_dropout)
+
+    def deactivate_dropout_testing(self):
+        def deactivate_dropout(m):
+            if isinstance(m, DropoutPrediction):
+                m.deactivate()
+        self.apply(deactivate_dropout)
 
     def forward(self, x_in):
         l1_start = self.inconv(x_in)
@@ -95,17 +109,17 @@ class SUNETx5(nn.Module):
 
         self.dual1 = DualRes(1 * nfilts, ndims)
         self.dual2 = DualRes(2 * nfilts, ndims)
-        self.dual3 = DualRes(4 * nfilts, ndims)
-        self.dual4 = DualRes(8 * nfilts, ndims)
-        self.dual5 = DualRes(16 * nfilts, ndims, dropout_rate=0.1)
+        self.dual3 = DualRes(4 * nfilts, ndims, dropout_prediction=True)
+        self.dual4 = DualRes(8 * nfilts, ndims, dropout_prediction=True)
+        self.dual5 = DualRes(16 * nfilts, ndims, dropout_rate=0.1, dropout_prediction=True)
 
         self.down1 = DownStep(1 * nfilts, ndims)
         self.down2 = DownStep(2 * nfilts, ndims)
         self.down3 = DownStep(4 * nfilts, ndims)
         self.down4 = DownStep(8 * nfilts, ndims)
 
-        self.mono4 = MonoRes(8 * nfilts, ndims)
-        self.mono3 = MonoRes(4 * nfilts, ndims)
+        self.mono4 = MonoRes(8 * nfilts, ndims, dropout_prediction=True)
+        self.mono3 = MonoRes(4 * nfilts, ndims, dropout_prediction=True)
         self.mono2 = MonoRes(2 * nfilts, ndims)
         self.mono1 = MonoRes(1 * nfilts, ndims)
 
@@ -158,7 +172,7 @@ class SUNETx5(nn.Module):
         return pred
 
 class DualRes(nn.Module):
-    def __init__(self, num_ch, ndims=3, dropout_rate=0.0):
+    def __init__(self, num_ch, ndims=3, dropout_rate=0.0, dropout_prediction=False):
         super(DualRes, self).__init__()
 
         Conv = nn.Conv2d if ndims is 2 else nn.Conv3d
@@ -166,6 +180,7 @@ class DualRes(nn.Module):
         Dropout = nn.Dropout2d if ndims is 2 else nn.Dropout3d
 
         self.conv_path = nn.Sequential(
+            DropoutPrediction(forever_inactive=not dropout_prediction),
             BatchNorm(num_ch, momentum=BN_MOMENTUM, eps=0.001),
             nn.PReLU(num_ch, init=INIT_PRELU),
             Conv(num_ch, num_ch, 3, padding=1),
@@ -180,12 +195,13 @@ class DualRes(nn.Module):
 
 
 class MonoRes(nn.Module):
-    def __init__(self, num_ch, ndims=3):
+    def __init__(self, num_ch, ndims=3, dropout_prediction=False):
         super(MonoRes, self).__init__()
 
         Conv = nn.Conv2d if ndims is 2 else nn.Conv3d
         BatchNorm = nn.BatchNorm2d if ndims is 2 else nn.BatchNorm3d
         self.conv_path = nn.Sequential(
+            DropoutPrediction(forever_inactive=not dropout_prediction),
             BatchNorm(num_ch, momentum=BN_MOMENTUM, eps=0.001),
             nn.PReLU(num_ch, init=INIT_PRELU),
             Conv(num_ch, num_ch, 3, padding=1))

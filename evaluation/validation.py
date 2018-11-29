@@ -3,7 +3,7 @@ import os
 import copy
 
 from niclib.network.training import EarlyStoppingTrain
-from niclib.network.generator import InstructionGenerator
+from niclib.network.generator import PatchGeneratorBuilder
 from niclib.postprocessing import NIC_Postprocessing
 
 from niclib.io.results import *
@@ -13,12 +13,10 @@ from niclib.utils import *
 from niclib.io.metrics import print_metrics_list
 
 class SimpleValidation:
-    def __init__(self, model_definition, images, split_ratio, model_trainer, train_instr_gen, val_instr_gen, checkpoint_pathfile, log_pathfile, test_predictor, test_binarizer, results_path, test_postproc=None):
+    def __init__(self, model_definition, images, split_ratio, model_trainer, train_instr_gen, val_instr_gen, checkpoint_pathfile, log_pathfile, test_predictor, results_path):
         assert isinstance(model_trainer, EarlyStoppingTrain)  # TODO make abstract trainer class
-        assert isinstance(train_instr_gen, InstructionGenerator)
-        assert isinstance(val_instr_gen, InstructionGenerator)
-        if test_postproc is not None:
-            assert isinstance(test_postproc, NIC_Postprocessing)
+        assert isinstance(train_instr_gen, PatchGeneratorBuilder)
+        assert isinstance(val_instr_gen, PatchGeneratorBuilder)
 
         assert checkpoint_pathfile.endswith('.pt')
         assert log_pathfile.endswith('.csv')
@@ -35,8 +33,6 @@ class SimpleValidation:
         self.val_instr_gen = val_instr_gen
 
         self.predictor = test_predictor
-        self.postproc = test_postproc
-        self.binarizer = test_binarizer
 
         if not os.path.exists(results_path):
             os.mkdir(results_path)
@@ -61,21 +57,18 @@ class SimpleValidation:
         self.trainer.train(model_fold, train_gen, val_gen, self.checkpoint_pathfile, self.log_pathfile)
 
         print("Loading trained model {}".format(self.checkpoint_pathfile))
-        model_fold = torch.load(self.checkpoint_pathfile, self.trainer.device)
+
+        model_dict = model_fold.state_dict()
+        pretrained_dict = torch.load(self.checkpoint_pathfile, self.trainer.device).state_dict()
+
+        # 1. filter out unnecessary keys
+        pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
+        # 2. overwrite entries in the existing state dict
+        model_dict.update(pretrained_dict)
+        # 3. load the new state dict
+        model_fold.load_state_dict(pretrained_dict)
 
         # Predict validation set
         for n, sample in enumerate(val_images):
             probs = self.predictor.predict_sample(model_fold, sample)
-
-            # TODO take postprocessing, binarization and storage logic OUT
-            if self.postproc is not None:
-                probs = self.postproc.postprocess(probs, params=(sample.statistics,))
-
             save_image_probs(self.results_path + '{}_probs.nii.gz'.format(sample.id), sample, probs)
-
-            if self.binarizer is not None:
-                seg = self.binarizer.binarize(probs)
-                save_image_seg(self.results_path + '{}_seg.nii.gz'.format(sample.id), sample, seg)
-
-                metrics = compute_segmentation_metrics(sample.labels[0], seg)
-                print_metrics_list(metrics, [sample.id])

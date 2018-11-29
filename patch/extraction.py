@@ -6,6 +6,8 @@ from niclib.patch.slices import *
 from niclib.patch.sampling import *
 from niclib.io.terminal import printProgressBar
 
+# TODO make InstructionGenerator object
+
 # TODO change idx for id
 
 def build_sample_extraction_instructions(image, in_shape, out_shape, sampler, augment_to=None, idx=None):
