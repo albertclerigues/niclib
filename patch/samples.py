@@ -3,7 +3,7 @@ import numpy as np
 import logging as log
 import itertools as iter
 
-from niclib.dataset.NICdataset import NICimage
+from niclib.dataset import NIC_Image
 from niclib.patch.volume import pad_volume
 
 
@@ -68,7 +68,7 @@ def normalise_set(set_in, mean=None, std=None):
 
 
 def compute_sample_statistics(sample_in):
-    assert isinstance(sample_in, NICimage)
+    assert isinstance(sample_in, NIC_Image)
     num_modalities = sample_in.data.shape[0]
 
     mean = np.zeros((num_modalities,))

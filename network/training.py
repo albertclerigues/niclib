@@ -76,6 +76,9 @@ class EarlyStoppingTrain:
             self.current_epoch += 1
             print("Epoch {}/{}".format(self.current_epoch, self.max_epochs))
 
+            try: model.print_noiser()
+            except AttributeError: pass
+
             # Train current epoch and test on validation set
             epoch_train_metrics = self.train_epoch(model, model_optimizer, train_gen)
             epoch_test_metrics = self.test_epoch(model, val_gen)
@@ -113,7 +116,20 @@ class EarlyStoppingTrain:
         for batch_idx, (x, y) in enumerate(train_gen):
             optimizer.zero_grad()  # Reset accumulated gradients
 
-            x, y = x.to(self.device), y.to(self.device)
+            # Send generated x,y batch to GPU
+            if isinstance(x, list):
+                for i in range(len(x)):
+                    x[i] = x[i].to(self.device)
+            else:
+                x = x.to(self.device)
+
+            if isinstance(y, list):
+                for i in range(len(y)):
+                    y[i] = y[i].to(self.device)
+            else:
+                y = y.to(self.device)
+
+            # Forward pass and loss computation
             y_pred = model(x)
             loss = self.train_loss_func(y_pred, y)
 

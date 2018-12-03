@@ -1,45 +1,124 @@
-import sys
-import copy
-import math
-import numpy as np
-import logging as log
-import scipy.misc
-import itertools as iter
+from abc import ABC, abstractmethod
+
+import torch
 
 from niclib.patch.patches import *
 from niclib.patch.samples import *
-from niclib.utils import get_resampling_indexes
+import itertools as iter
+from abc import ABC, abstractmethod
 
-class PatchExtractInstruction:
-    def __init__(self, sample_idx=-1, data_patch_slice=None, label_patch_slice=None, augment_func=None):
-        self.sample_idx = sample_idx
+from niclib.volume import zeropad_sample
+from niclib.patch.centers import *
+from niclib.patch.slices import *
+from niclib.patch.sampling import *
+from niclib.io.terminal import printProgressBar
+from niclib.dataset import NIC_Dataset
+
+
+class NIC_Instruction(ABC):
+    @abstractmethod
+    def extract_from(self, images):
+        pass
+
+class NIC_InstructionGenerator(ABC):
+    @abstractmethod
+    def generate_instructions(self, images):
+        pass
+
+
+class PatchSegmentationInstruction(NIC_Instruction):
+    def __init__(self, sample_id=-1, data_patch_slice=None, label_patch_slice=None, augment_func=None, normalise=True):
+        self.sample_id = sample_id
 
         self.data_patch_slice = data_patch_slice
         self.label_patch_slice = label_patch_slice
 
+        self.normalise_data_patch = normalise
         self.augment_func = augment_func
 
-def extract_patch_with_instruction(samples, instruction, normalise=True):
-    assert isinstance(instruction, PatchExtractInstruction)
-    sample = samples[instruction.sample_idx] if isinstance(samples, list) else samples
-    assert isinstance(sample, NICimage)
+    def extract_from(self, images):
+        # Obtain image from list
+        sample = NIC_Dataset.get_by_id(self.sample_id, images) if isinstance(images, list) else images
+        assert isinstance(sample, NIC_Image)
+        assert self.sample_id == sample.id
 
-    extract_label = instruction.label_patch_slice is not None and sample.labels is not None
+        # Extract patches
+        data_patch = extract_patch_with_slice(sample.data, self.data_patch_slice)
 
-    # Extract patches
-    data_patch = extract_patch_at(sample.data, instruction.data_patch_slice)
-    label_patch = extract_patch_at(sample.labels, instruction.label_patch_slice) if extract_label else None
+        do_extract_label = self.label_patch_slice is not None and sample.labels is not None
+        label_patch = extract_patch_with_slice(sample.labels, self.label_patch_slice) if do_extract_label else None
 
-    # Normalize data patch
-    if normalise:
-        data_patch = normalise_patch(data_patch, sample.statistics['mean'], sample.statistics['std_dev'])
+        # Normalize data patch
+        if self.normalise_data_patch:
+            data_patch = normalise_patch(data_patch, sample.statistics['mean'], sample.statistics['std_dev'])
 
-    # Augment patches
-    if instruction.augment_func is not None:
-        augment_func = get_augment_functions(x_axis=1, y_axis=2)[instruction.augment_func]
-        data_patch, label_patch = augment_func((data_patch, label_patch if extract_label else None))
+        # Augment patches
+        if self.augment_func is not None:
+            augment_func = get_augment_functions(x_axis=1, y_axis=2)[self.augment_func]
+            data_patch, label_patch = augment_func((data_patch, label_patch if do_extract_label else None))
 
-    return np.ascontiguousarray(data_patch), np.ascontiguousarray(label_patch)
+        dpatch = torch.tensor(np.ascontiguousarray(data_patch, dtype=np.float32))
+        lpatch = torch.tensor(np.ascontiguousarray(label_patch, dtype=np.float32))
+        return dpatch, lpatch
+
+
+class AutodenoiserInstruction(PatchSegmentationInstruction):
+    def extract_from(self, images):
+        dpatch, lpatch = super().extract_from(images)
+        return dpatch, [lpatch, dpatch[:1, ...]] # Take only ct from dpatch for
+
+
+class PatchInstructionGenerator(NIC_InstructionGenerator):
+    def __init__(self, in_shape, out_shape, sampler, augment_to=None, autodenoiser=False):
+        assert isinstance(sampler, NICSampler)
+        self.in_shape = in_shape
+        self.out_shape = out_shape
+        self.sampler = sampler
+        self.augment_positives = augment_to
+        self.autodenoiser = autodenoiser
+
+    def generate_instructions(self, images):
+        assert isinstance(images, list) and all([isinstance(image, NIC_Image) for image in images])
+
+        set_instructions = []
+        for idx, image in enumerate(images):
+            printProgressBar(idx, len(images), suffix='samples processed')
+
+            centers = self.sampler.get_centers(image)
+            if isinstance(centers, tuple):  # Sampling that have two sets of centers
+                pos_centers, unif_centers = centers
+                pos_instructions = get_instructions_from_centers(image.id, pos_centers, self.in_shape, self.out_shape,
+                    augment_to=self.augment_positives, autodenoiser=self.autodenoiser)
+                unif_instructions = get_instructions_from_centers(image.id, unif_centers, self.in_shape, self.out_shape,
+                    augment_to=None, autodenoiser=self.autodenoiser)
+                image_instructions = pos_instructions + unif_instructions
+            else:
+                image_instructions = get_instructions_from_centers(image.id, centers, self.in_shape, self.out_shape,
+                    augment_to=self.augment_positives, autodenoiser=self.autodenoiser)
+            set_instructions += image_instructions
+        printProgressBar(len(images), len(images), suffix='samples processed')
+
+        return set_instructions
+
+def get_instructions_from_centers(sample_id, centers, patch_shape, output_shape, augment_to=None, autodenoiser=False):
+    data_slices = get_patch_slices(centers, patch_shape)
+    label_slices = get_patch_slices(centers, output_shape)
+
+    sample_instructions = list()
+    for data_slice, label_slice in zip(data_slices, label_slices):
+        if not autodenoiser:
+            instruction = PatchSegmentationInstruction(
+                sample_id=sample_id, data_patch_slice=data_slice, label_patch_slice=label_slice, normalise=True)
+        else:
+            instruction = AutodenoiserInstruction(
+                sample_id=sample_id, data_patch_slice=data_slice, label_patch_slice=label_slice, normalise=True)
+        sample_instructions.append(instruction)
+
+    if augment_to is not None:
+        sample_instructions = augment_instructions(sample_instructions, goal_num_instructions=augment_to)
+
+    return sample_instructions
+
 
 
 def augment_instructions(original_instructions, goal_num_instructions):

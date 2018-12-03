@@ -43,30 +43,25 @@ class SimpleValidation:
 
         print("\n" + "-" * 75 +"\n Running eval on val images {} to {} \n".format(start_idx_val, stop_idx_val) + "-" * 75 + "\n", sep='')
 
+
         model_fold = copy.deepcopy(self.model_definition)
         train_images = self.images[:start_idx_val] + self.images[stop_idx_val:]
         val_images = self.images[start_idx_val:stop_idx_val]
 
-        print("Building training generator...")
-        train_gen = self.train_instr_gen.build_patch_generator(images=train_images)
-        print("Building validation generator...")
-        val_gen = self.val_instr_gen.build_patch_generator(images=val_images)
-        print("Generators with {} training and {} validation patches".format(
-            len(train_gen)*self.trainer.bs, len(val_gen)*self.trainer.bs))
+        if self.trainer.max_epochs > 0:
+            print("Building training generator...")
+            train_gen = self.train_instr_gen.build_patch_generator(images=train_images)
+            print("Building validation generator...")
+            val_gen = self.val_instr_gen.build_patch_generator(images=val_images)
+            print("Generators with {} training and {} validation patches".format(
+                len(train_gen)*self.trainer.bs, len(val_gen)*self.trainer.bs))
 
-        self.trainer.train(model_fold, train_gen, val_gen, self.checkpoint_pathfile, self.log_pathfile)
+            self.trainer.train(model_fold, train_gen, val_gen, self.checkpoint_pathfile, self.log_pathfile)
 
         print("Loading trained model {}".format(self.checkpoint_pathfile))
+        model_fold = torch.load(self.checkpoint_pathfile, self.trainer.device)
 
-        model_dict = model_fold.state_dict()
-        pretrained_dict = torch.load(self.checkpoint_pathfile, self.trainer.device).state_dict()
-
-        # 1. filter out unnecessary keys
-        pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
-        # 2. overwrite entries in the existing state dict
-        model_dict.update(pretrained_dict)
-        # 3. load the new state dict
-        model_fold.load_state_dict(pretrained_dict)
+        # TODO things
 
         # Predict validation set
         for n, sample in enumerate(val_images):

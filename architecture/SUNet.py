@@ -50,7 +50,6 @@ class SUNETx4(nn.Module):
         self.softmax = nn.Softmax(dim=1) # Channels dimension
 
         self.apply(init_weights)
-
         model_parameters = filter(lambda p: p.requires_grad, self.parameters())
         nparams = sum([np.prod(p.size()) for p in model_parameters])
         print("SUNETx4 network with {} parameters".format(nparams))
@@ -99,6 +98,7 @@ class SUNETx4(nn.Module):
 
         return pred
 
+
 class SUNETx5(nn.Module):
     def __init__(self, in_ch=5, out_ch=2, nfilts=32, ndims=3):
         super(SUNETx5, self).__init__()
@@ -132,6 +132,9 @@ class SUNETx5(nn.Module):
         self.softmax = nn.Softmax(dim=1) # Channels dimension
 
         self.apply(init_weights)
+        model_parameters = filter(lambda p: p.requires_grad, self.parameters())
+        nparams = sum([np.prod(p.size()) for p in model_parameters])
+        print("SUNETx5 network with {} parameters".format(nparams))
 
     def forward(self, x_in):
         l1_start = self.inconv(x_in)
@@ -180,7 +183,7 @@ class DualRes(nn.Module):
         Dropout = nn.Dropout2d if ndims is 2 else nn.Dropout3d
 
         self.conv_path = nn.Sequential(
-            DropoutPrediction(forever_inactive=not dropout_prediction),
+            DropoutPrediction(inactive=not dropout_prediction),
             BatchNorm(num_ch, momentum=BN_MOMENTUM, eps=0.001),
             nn.PReLU(num_ch, init=INIT_PRELU),
             Conv(num_ch, num_ch, 3, padding=1),
@@ -201,7 +204,7 @@ class MonoRes(nn.Module):
         Conv = nn.Conv2d if ndims is 2 else nn.Conv3d
         BatchNorm = nn.BatchNorm2d if ndims is 2 else nn.BatchNorm3d
         self.conv_path = nn.Sequential(
-            DropoutPrediction(forever_inactive=not dropout_prediction),
+            DropoutPrediction(inactive=not dropout_prediction),
             BatchNorm(num_ch, momentum=BN_MOMENTUM, eps=0.001),
             nn.PReLU(num_ch, init=INIT_PRELU),
             Conv(num_ch, num_ch, 3, padding=1))

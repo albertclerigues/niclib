@@ -19,7 +19,6 @@ class RED_CNN(nn.Module):
         self.out_conv = ConvTranspose(nfilts, out_ch, 5)
         self.relus = torch.nn.ModuleList([nn.ReLU() for _ in range(5)])
 
-
         model_parameters = filter(lambda p: p.requires_grad, self.parameters())
         nparams = sum([np.prod(p.size()) for p in model_parameters])
         print("RED-CNN network with {} parameters".format(nparams))

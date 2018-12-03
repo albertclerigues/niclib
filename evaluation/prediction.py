@@ -3,26 +3,27 @@ from abc import ABC, abstractmethod
 import torch
 import numpy as np
 
-from niclib.dataset.NICdataset import NICimage
+from niclib.dataset import NIC_Image
 from niclib.network.generator import PatchGeneratorBuilder
-from niclib.patch.instructions import PatchExtractInstruction
+#from niclib.patch.instructions import PatchExtractInstruction
 
 from niclib.volume import zeropad_sample, remove_zeropad_volume
 
 from niclib.io.terminal import printProgressBar
 
-class Predictor(ABC):
+class NIC_Predictor(ABC):
     @abstractmethod
     def predict_sample(self, model, sample):
         pass
 
-class PatchPredictor(Predictor):
+class PatchPredictor(NIC_Predictor):
     """
     Predicts a whole volume using patches with the provided model
     """
 
-    def __init__(self, instruction_generator, num_classes, uncertainty_dropout=0.0, uncertainty_passes=1, lesion_class=None, device=torch.device('cuda')):
+    def __init__(self, instruction_generator, num_classes, zeropad_shape=None, uncertainty_dropout=0.5, uncertainty_passes=5, lesion_class=None, device=torch.device('cuda')):
         assert isinstance(instruction_generator, PatchGeneratorBuilder)
+        self.zeropad_shape = zeropad_shape
         self.instr_gen = instruction_generator
 
         self.num_classes = num_classes
@@ -33,10 +34,10 @@ class PatchPredictor(Predictor):
         self.uncertainty_dropout = uncertainty_dropout
 
     def predict_sample(self, model, sample_in):
-        assert isinstance(sample_in, NICimage)
+        assert isinstance(sample_in, NIC_Image)
         print("Predicting sample with id:{}".format(sample_in.id))
 
-        sample = zeropad_sample(sample_in, self.instr_gen.in_shape)
+        sample = zeropad_sample(sample_in, self.zeropad_shape)
 
         batch_size = self.instr_gen.bs
         sample_generator, instructions = self.instr_gen.build_patch_generator(sample, return_instructions=True)
@@ -48,8 +49,7 @@ class PatchPredictor(Predictor):
         model.to(self.device)
 
         if self.uncertainty_passes > 1:
-            try:
-                model.activate_dropout_testing(p_out=self.uncertainty_dropout)
+            try: model.activate_dropout_testing(p_out=self.uncertainty_dropout)
             except AttributeError as ae:
                 print(str(ae), "Dropout at test time not configured for this model")
                 self.uncertainty_passes = 1
@@ -58,14 +58,24 @@ class PatchPredictor(Predictor):
             for batch_idx, (x, y) in enumerate(sample_generator):
                 printProgressBar(batch_idx, len(sample_generator), suffix=' patches predicted')
 
-                x, y = x.to(self.device), y.to(self.device)
+                # Send generated x,y batch to GPU
+                if isinstance(x, list):
+                    for i in range(len(x)):
+                        x[i] = x[i].to(self.device)
+                else:
+                    x = x.to(self.device)
+
+                if isinstance(y, list):
+                    for i in range(len(y)):
+                        y[i] = y[i].to(self.device)
+                else:
+                    y = y.to(self.device)
 
                 y_pred = model(x)
                 if self.uncertainty_passes > 1:
                     for i in range(1, self.uncertainty_passes):
                         y_pred = y_pred + model(x)
                     y_pred = y_pred / self.uncertainty_passes
-                    y_pred = torch.nn.functional.softmax(y_pred, dim=1)
 
                 y_pred = y_pred.cpu().numpy()
                 if len(y_pred.shape) == 4:  # Add third dimension to 2D patches
@@ -91,7 +101,7 @@ class PatchPredictor(Predictor):
         else:
             volume_probs = np.squeeze(volume_probs, axis=0)
 
-        volume_probs = remove_zeropad_volume(volume_probs, self.instr_gen.in_shape)
+        volume_probs = remove_zeropad_volume(volume_probs, self.zeropad_shape)
 
         assert np.array_equal(volume_probs.shape, sample_in.foreground.shape), (volume_probs.shape, sample_in.foreground.shape)
 

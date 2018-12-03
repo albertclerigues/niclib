@@ -3,7 +3,8 @@ import nibabel as nib
 import os
 
 import warnings
-from niclib.dataset.NICdataset import NICimage
+from niclib.dataset import NIC_Image
+
 
 # TODO
 class ResultFilenameGenerator:
@@ -15,7 +16,7 @@ class ResultFilenameGenerator:
 
 
 def _save_result_volume(filename, image, result, dtype):
-    assert isinstance(image, NICimage)
+    assert isinstance(image, NIC_Image)
     probs_out = np.multiply(result, image.foreground).astype(dtype)
     img_out = nib.Nifti1Image(probs_out, image.nib['affine'], image.nib['header'])
     nib.save(img_out, filename)
@@ -38,7 +39,7 @@ def load_result_set(result_path, original_images, filename_gen=None, result_type
     Loads a result set where the first term is the sample idx
     """
     assert os.path.exists(result_path)
-    assert all([isinstance(img, NICimage) for img in original_images])
+    assert all([isinstance(img, NIC_Image) for img in original_images])
     #assert isinstance(filename_gen, ResultFilenameGenerator)
 
     result_set = dict()

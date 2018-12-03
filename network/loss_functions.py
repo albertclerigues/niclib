@@ -2,6 +2,28 @@ import torch
 import torch.nn.functional as F
 from abc import ABC, abstractmethod
 
+class NIC_autodenoiser_loss(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        #self.ND_loss_func = torch.nn.MSELoss()
+        self.ND_loss_func = torch.nn.L1Loss()
+        self.DS_loss_func = NIC_binary_xent_gdl(type_weight='Simple')
+
+    def forward(self, output_pack, target_pack):
+        if isinstance(output_pack, list) and isinstance(target_pack, list) and len(output_pack) == len(target_pack) == 2:
+            output_DS, output_ND = output_pack[0], output_pack[1]
+            target_DS, target_ND = target_pack[0], target_pack[1]
+
+            DS_loss = self.DS_loss_func(output_DS, target_DS)
+            ND_loss = self.ND_loss_func(output_ND, target_ND)
+
+            return DS_loss + ND_loss
+        else:
+            output_DS = output_pack
+            target_DS = target_pack
+            DS_loss = self.DS_loss_func(output_DS, target_DS)
+            return DS_loss
+
 
 class NIC_MSE_reg_l1_fft(torch.nn.Module):
     def __init__(self, w_reg=1.0):

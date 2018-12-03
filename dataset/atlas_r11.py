@@ -4,9 +4,10 @@ import numpy as np
 import itertools as iter
 
 from niclib.io.terminal import printProgressBar
-from niclib.dataset.NICdataset import NICdataset, NICimage
+from dataset import NIC_Image, NIC_Dataset
 
-class Atlas_R11(NICdataset):
+
+class Atlas_R11(NIC_Dataset):
     def __init__(self, path, modalities=('t1w',), nvols=229):
         super().__init__()
         print("Loading ATLAS dataset...")
@@ -49,7 +50,7 @@ class Atlas_R11(NICdataset):
                 for lesion_file in lesion_paths:
                     labels = np.logical_or(nib.load(lesion_file).get_data() > 0, labels)
 
-                sample = NICimage(sample_id, nib_file, data, foreground_mask, labels)
+                sample = NIC_Image(sample_id, nib_file, data, foreground_mask, labels)
                 self.train.append(sample)
 
                 if loaded_samples > nvols:

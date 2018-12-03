@@ -12,7 +12,7 @@ import sys
 from niclib.utils import get_resampling_indexes
 
 
-def extract_patch_at(volume, patch_slice):
+def extract_patch_with_slice(volume, patch_slice):
     assert volume.ndim == len(patch_slice)
 
     patch_out = copy.deepcopy(volume[patch_slice])
