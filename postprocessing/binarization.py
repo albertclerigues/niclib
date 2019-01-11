@@ -1,5 +1,8 @@
 import copy
 import itertools
+import time
+from threading import Thread
+
 import numpy as np
 from scipy import ndimage
 
@@ -43,8 +46,7 @@ class ThreshSizeBinarizer(Binarizer):
 
         return y_pred
 
-def thresh_size_search_inefficient(result_set, images, thresholds, lesion_sizes, compute_lesion_metrics=False):
-
+def thresh_size_search_single(result_set, images, thresholds, lesion_sizes, compute_lesion_metrics=False):
     true_vols, prob_vols = [], []
     for img in images:
         true_vols.append(img.labels[0])
@@ -76,57 +78,46 @@ def thresh_size_search_inefficient(result_set, images, thresholds, lesion_sizes,
     return metrics_list, metrics_names
 
 
+def process_sample_metrics(true_vol, lesion_probs, thresh, lesion_size, compute_lesion_metrics, result_metrics, sample_idx):
+    rec_vol = ThreshSizeBinarizer(thresh, lesion_size).binarize(lesion_probs)
+    result_metrics[sample_idx] = compute_segmentation_metrics(true_vol, rec_vol, lesion_metrics=compute_lesion_metrics)
+
+
 def thresh_size_search(result_set, images, thresholds, lesion_sizes, compute_lesion_metrics=False):
-    # Preallocate empty list to store the samples metrics, for each th and ls combination
-    metrics_iter = {}
-    for thresh in thresholds:
-        for min_lesion_size in lesion_sizes:
-            metrics_iter["th={}_ls={}".format(thresh, min_lesion_size)] = []
+    # 6x faster than the inefficient one
 
-    # Compute and store the results for each sample, thresh and min_lesion_size combination
-    print("Evaluating threshold and lesion size for binarization")
-    for sample_num, sample in enumerate(images):
-        printProgressBar(sample_num, len(result_set), suffix=" samples processed")
-        if sample.id not in result_set:
-            continue
+    true_vols, prob_vols = [], []
+    for img in images:
+        true_vols.append(img.labels[0])
+        prob_vols.append(result_set[img.id] if img.id in result_set else None)
 
-        true_vol = sample.labels[0]
-        lesion_probs = result_set[sample.id]
+    # Generate result filename and try to load_samples results
+    metrics_list = list()
+    metrics_names = list()
+    for n, (thresh, lesion_size) in enumerate(itertools.product(thresholds, lesion_sizes)):
+        printProgressBar(n, len(thresholds) * len(lesion_sizes), suffix=" parameters evaluated")
 
-        for thresh in thresholds:
-            y_prob = lesion_probs > thresh
+        threads = []
+        metrics_iter = [None] * len(prob_vols)
+        for sample_idx, (lesion_probs, true_vol) in enumerate(zip(prob_vols, true_vols)):
+            if lesion_probs is None:
+                continue
 
-            # Get connected components information
-            y_prob_labelled, nlesions = ndimage.label(y_prob)
+            process = Thread(target=process_sample_metrics, args=[true_vol, lesion_probs, thresh, lesion_size, compute_lesion_metrics, metrics_iter, sample_idx])
+            process.start()
+            threads.append(process)
 
-            label_list = np.arange(1, nlesions + 1)
-            lesion_volumes = [0.0]
-            if nlesions > 0:
-                lesion_volumes = ndimage.labeled_comprehension(y_prob, y_prob_labelled, label_list, np.sum, float, 0)
+        # Ensure every volume has been processed and remove none entries from results
+        for process in threads:
+            process.join()
+        metrics_iter = [m for m in metrics_iter if m is not None] # in case incomplete prob set
 
-            for min_lesion_size in lesion_sizes:
-                if nlesions > 0:
-                    # Set to 0 invalid lesions
-                    lesions_to_ignore = [idx + 1 for idx, lesion_vol in enumerate(lesion_volumes) if
-                                         lesion_vol < min_lesion_size]
+        # Compute average for the specific thresh and lesion size and store
+        m_avg_std = compute_avg_std_metrics_list(metrics_iter)
 
-                    rec_vol = copy.deepcopy(y_prob_labelled)
-                    rec_vol[np.isin(y_prob_labelled, lesions_to_ignore)] = 0.0
-                else:
-                    rec_vol = np.zeros_like(y_prob_labelled)
+        metrics_list.append(m_avg_std)
+        metrics_names.append("th={}_ls={}".format(thresh, lesion_size))
 
-                metrics_iter["th={}_ls={}".format(thresh, min_lesion_size)].append(
-                    compute_segmentation_metrics(true_vol, rec_vol, lesion_metrics=compute_lesion_metrics))
-    printProgressBar(len(result_set), len(result_set), suffix=" samples processed")
-
-    # Compute avg_std for each metric th and ls combination
-    metrics_list, metrics_names = list(), list()
-    for thresh in thresholds:
-        for min_lesion_size in lesion_sizes:
-            metrics_name = "th={}_ls={}".format(thresh, min_lesion_size)
-            metrics_names.append(metrics_name)
-
-            metrics_avg_std = compute_avg_std_metrics_list(metrics_iter[metrics_name])
-            metrics_list.append(metrics_avg_std)
-
+    printProgressBar(len(thresholds) * len(lesion_sizes), len(thresholds) * len(lesion_sizes),
+                     suffix=" parameters evaluated")
     return metrics_list, metrics_names

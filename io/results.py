@@ -30,11 +30,11 @@ def save_image_seg(filename, image, probs, dtype='uint16'):
     _save_result_volume(filename, image, probs, dtype)
 
 
-def save_result_set(result_path, original_images, filename_gen=None, result_type='probs', file_format='nii.gz'):
+def save_result_set(result_path, original_images, filename_gen=None, result_type='pred', file_format='nii.gz'):
     # TODO
     pass
 
-def load_result_set(result_path, original_images, filename_gen=None, result_type='probs', file_format='nii.gz'):
+def load_result_set(result_path, original_images, filename_gen=None, result_type='pred', file_format='nii.gz'):
     """
     Loads a result set where the first term is the sample idx
     """
@@ -48,6 +48,7 @@ def load_result_set(result_path, original_images, filename_gen=None, result_type
         result_filename = "{}_{}.{}".format(image.id, result_type, file_format)
         result_pathfile = os.path.join(result_path, result_filename)
         if not os.path.isfile(result_pathfile):
+            print("NOT FOUND: {}".format(result_pathfile))
             continue
 
         result_set[image.id] = nib.load(result_pathfile).get_data()

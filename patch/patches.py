@@ -172,13 +172,24 @@ def elastic_transform_patches(data_patch, label_patch,  x_axis, y_axis, alpha_fa
 
     return data_patch_out, label_patch_out
 
-def get_augment_functions(x_axis=1, y_axis=2):
+def get_augment_functions_2d(x_axis=1, y_axis=2):
     augment_funcs = {
         0: lambda patches: elastic_transform_patches(patches[0], patches[1], x_axis, y_axis),
         1: lambda patches: elastic_transform_patches(patches[0], patches[1], x_axis, y_axis),
         2: lambda patches: elastic_transform_patches(patches[0], patches[1], x_axis, y_axis),
         3: lambda patches: elastic_transform_patches(patches[0], patches[1], x_axis, y_axis),
         4: lambda patches: elastic_transform_patches(patches[0], patches[1], x_axis, y_axis)
+    }
+
+    return augment_funcs
+
+def get_augment_functions(x_axis=1, y_axis=2):
+    augment_funcs = {
+        0: lambda patch: (np.rot90(patch[0].astype(np.float32), k=1, axes=(x_axis, y_axis)), np.rot90(patch[1].astype(np.float32), k=1, axes=(x_axis, y_axis))),
+        1: lambda patch: (np.rot90(patch[0].astype(np.float32), k=2, axes=(x_axis, y_axis)), np.rot90(patch[1].astype(np.float32), k=2, axes=(x_axis, y_axis))),
+        2: lambda patch: (np.rot90(patch[0].astype(np.float32), k=3, axes=(x_axis, y_axis)),np.rot90(patch[1].astype(np.float32), k=3, axes=(x_axis, y_axis))),
+        3: lambda patch: (np.flip(patch[0].astype(np.float32), axis=x_axis), np.flip(patch[1].astype(np.float32), axis=x_axis)),
+        4: lambda patch: (np.flip(patch[0].astype(np.float32), axis=y_axis), np.flip(patch[1].astype(np.float32), axis=x_axis)),
     }
 
     return augment_funcs

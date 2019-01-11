@@ -3,49 +3,64 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import numpy as np
+from niclib.architecture import NIC_Architecture
+from niclib.network.layers import DropoutPrediction
 
-class Unet3DCicek(torch.nn.Module):
-    def __init__(self, in_ch=1, out_ch=1, ndims=3, nfilts = 32, softmax_out=True):
+
+class Unet3D(NIC_Architecture):
+    def __init__(self, in_ch=1, out_ch=1, ndims=3, nfilts = 16, softmax_out=True):
         super().__init__()
+
         Conv = nn.Conv2d if ndims is 2 else nn.Conv3d
         ConvTranspose = nn.ConvTranspose2d if ndims is 2 else nn.ConvTranspose3d
         BatchNorm = nn.BatchNorm2d if ndims is 2 else nn.BatchNorm3d
         MaxPool = nn.MaxPool2d if ndims is 2 else nn.MaxPool3d
 
-        self.conv1 = torch.nn.Sequential(Conv(in_ch, nfilts, 3, padding=1), BatchNorm(nfilts, momentum=0.01), nn.ReLU())
-        self.conv2 = torch.nn.Sequential(Conv(nfilts, 2 * nfilts, 3, padding=1), BatchNorm(2 * nfilts, momentum=0.01), nn.ReLU())
+        self.conv1 = torch.nn.Sequential(
+            Conv(in_ch, nfilts, 3, padding=1), BatchNorm(nfilts, momentum=0.01), nn.ReLU())
+        self.conv2 = torch.nn.Sequential(
+            Conv(nfilts, 2 * nfilts, 3, padding=1), BatchNorm(2 * nfilts, momentum=0.01), nn.ReLU())
         self.down1 = MaxPool(2)
 
-        self.conv3 = torch.nn.Sequential(Conv(2 * nfilts, 2 * nfilts, 3, padding=1), BatchNorm(2 * nfilts, momentum=0.01), nn.ReLU())
-        self.conv4 = torch.nn.Sequential(Conv(2 * nfilts, 4 * nfilts, 3, padding=1), BatchNorm(4 * nfilts, momentum=0.01), nn.ReLU())
+        self.conv3 = torch.nn.Sequential(
+            Conv(2 * nfilts, 2 * nfilts, 3, padding=1), BatchNorm(2 * nfilts, momentum=0.01), nn.ReLU())
+        self.conv4 = torch.nn.Sequential(
+            Conv(2 * nfilts, 4 * nfilts, 3, padding=1), BatchNorm(4 * nfilts, momentum=0.01), nn.ReLU())
         self.down2 = MaxPool(2)
 
-        self.conv5 = torch.nn.Sequential(Conv(4 * nfilts, 4 * nfilts, 3, padding=1), BatchNorm(4 * nfilts, momentum=0.01), nn.ReLU())
-        self.conv6 = torch.nn.Sequential(Conv(4 * nfilts, 8 * nfilts, 3, padding=1), BatchNorm(8 * nfilts, momentum=0.01), nn.ReLU())
+        self.conv5 = torch.nn.Sequential(
+            DropoutPrediction(), Conv(4 * nfilts, 4 * nfilts, 3, padding=1), BatchNorm(4 * nfilts, momentum=0.01), nn.ReLU())
+        self.conv6 = torch.nn.Sequential(
+            DropoutPrediction(), Conv(4 * nfilts, 8 * nfilts, 3, padding=1), BatchNorm(8 * nfilts, momentum=0.01), nn.ReLU())
         self.down3 = MaxPool(2)
 
-        self.conv7 = torch.nn.Sequential(Conv(8 * nfilts, 8 * nfilts, 3, padding=1), BatchNorm(8 * nfilts, momentum=0.01), nn.ReLU())
-        self.conv8 = torch.nn.Sequential(Conv(8 * nfilts, 16 * nfilts, 3, padding=1), BatchNorm(16 * nfilts, momentum=0.01), nn.ReLU())
+        self.conv7 = torch.nn.Sequential(
+            DropoutPrediction(), Conv(8 * nfilts, 8 * nfilts, 3, padding=1), BatchNorm(8 * nfilts, momentum=0.01), nn.ReLU())
+        self.conv8 = torch.nn.Sequential(
+            DropoutPrediction(), Conv(8 * nfilts, 16 * nfilts, 3, padding=1), BatchNorm(16 * nfilts, momentum=0.01), nn.ReLU())
         self.upconv1 = ConvTranspose(16 * nfilts, 16 * nfilts, 3, padding=1, output_padding=1, stride=2)
 
-        self.conv9 = torch.nn.Sequential(Conv(16 * nfilts + 8 * nfilts, 8 * nfilts, 3, padding=1), BatchNorm(8 * nfilts, momentum=0.01), nn.ReLU())
-        self.conv10 = torch.nn.Sequential(Conv(8 * nfilts, 8 * nfilts, 3, padding=1), BatchNorm(8 * nfilts, momentum=0.01), nn.ReLU())
+        self.conv9 = torch.nn.Sequential(
+            DropoutPrediction(), Conv(16 * nfilts + 8 * nfilts, 8 * nfilts, 3, padding=1), BatchNorm(8 * nfilts, momentum=0.01), nn.ReLU())
+        self.conv10 = torch.nn.Sequential(
+            DropoutPrediction(), Conv(8 * nfilts, 8 * nfilts, 3, padding=1), BatchNorm(8 * nfilts, momentum=0.01), nn.ReLU())
         self.upconv2 = ConvTranspose(8 * nfilts, 8 * nfilts, 3, padding=1, output_padding=1, stride=2)
 
-        self.conv11 = torch.nn.Sequential(Conv(8 * nfilts + 4 * nfilts, 4 * nfilts, 3, padding=1), BatchNorm(4 * nfilts, momentum=0.01), nn.ReLU())
-        self.conv12 = torch.nn.Sequential(Conv(4 * nfilts, 4 * nfilts, 3, padding=1), BatchNorm(4 * nfilts, momentum=0.01), nn.ReLU())
+        self.conv11 = torch.nn.Sequential(
+            Conv(8 * nfilts + 4 * nfilts, 4 * nfilts, 3, padding=1), BatchNorm(4 * nfilts, momentum=0.01), nn.ReLU())
+        self.conv12 = torch.nn.Sequential(
+            Conv(4 * nfilts, 4 * nfilts, 3, padding=1), BatchNorm(4 * nfilts, momentum=0.01), nn.ReLU())
         self.upconv3 = ConvTranspose(4 * nfilts, 4 * nfilts, 3, padding=1, output_padding=1, stride=2)
 
         self.conv13 = torch.nn.Sequential(Conv(4 * nfilts + 2 * nfilts, 2 * nfilts, 3, padding=1), BatchNorm(2 * nfilts, momentum=0.01), nn.ReLU())
         self.conv14 = torch.nn.Sequential(Conv(2 * nfilts, 2 * nfilts, 3, padding=1), BatchNorm(2 * nfilts, momentum=0.01), nn.ReLU())
 
         self.out_conv = Conv(2 * nfilts, out_ch, 3, padding=1)
-        self.softmax_out = nn.Softmax() if softmax_out is True else None
+        self.softmax_out = nn.Softmax(dim=1) if softmax_out is True else None
 
         model_parameters = filter(lambda p: p.requires_grad, self.parameters())
         nparams = sum([np.prod(p.size()) for p in model_parameters])
         print("Unet3D (Cicek) network with {} parameters".format(nparams))
-
 
     def forward(self, x_in):
         l1_start = self.conv1(x_in)

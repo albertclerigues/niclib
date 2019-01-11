@@ -21,7 +21,7 @@ class PatchPredictor(NIC_Predictor):
     Predicts a whole volume using patches with the provided model
     """
 
-    def __init__(self, instruction_generator, num_classes, zeropad_shape=None, uncertainty_dropout=0.5, uncertainty_passes=5, lesion_class=None, device=torch.device('cuda')):
+    def __init__(self, instruction_generator, num_classes, zeropad_shape=None, uncertainty_dropout=0.5, uncertainty_passes=0, uncertainty_dotype='alpha', lesion_class=None, device=torch.device('cuda')):
         assert isinstance(instruction_generator, PatchGeneratorBuilder)
         self.zeropad_shape = zeropad_shape
         self.instr_gen = instruction_generator
@@ -32,6 +32,7 @@ class PatchPredictor(NIC_Predictor):
 
         self.uncertainty_passes = uncertainty_passes
         self.uncertainty_dropout = uncertainty_dropout
+        self.uncertainty_dotype = uncertainty_dotype
 
     def predict_sample(self, model, sample_in):
         assert isinstance(sample_in, NIC_Image)
@@ -49,7 +50,9 @@ class PatchPredictor(NIC_Predictor):
         model.to(self.device)
 
         if self.uncertainty_passes > 1:
-            try: model.activate_dropout_testing(p_out=self.uncertainty_dropout)
+            try:
+                model.activate_dropout_testing(p_out=self.uncertainty_dropout, dotype=self.uncertainty_dotype)
+                print("Activated uncertainty dropout with p={}".format(self.uncertainty_dropout))
             except AttributeError as ae:
                 print(str(ae), "Dropout at test time not configured for this model")
                 self.uncertainty_passes = 1
@@ -64,6 +67,7 @@ class PatchPredictor(NIC_Predictor):
                         x[i] = x[i].to(self.device)
                 else:
                     x = x.to(self.device)
+
 
                 if isinstance(y, list):
                     for i in range(len(y)):

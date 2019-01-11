@@ -62,20 +62,21 @@ class PatchSegmentationInstruction(NIC_Instruction):
         return dpatch, lpatch
 
 
-class AutodenoiserInstruction(PatchSegmentationInstruction):
+class AutoencoderInstruction(PatchSegmentationInstruction):
     def extract_from(self, images):
         dpatch, lpatch = super().extract_from(images)
-        return dpatch, [lpatch, dpatch[:1, ...]] # Take only ct from dpatch for
+        return dpatch, dpatch
 
 
 class PatchInstructionGenerator(NIC_InstructionGenerator):
-    def __init__(self, in_shape, out_shape, sampler, augment_to=None, autodenoiser=False):
+    def __init__(self, in_shape, out_shape, sampler, augment_to=None, autoencoder=False):
         assert isinstance(sampler, NICSampler)
         self.in_shape = in_shape
         self.out_shape = out_shape
         self.sampler = sampler
         self.augment_positives = augment_to
-        self.autodenoiser = autodenoiser
+
+        self.autoencoder = autoencoder
 
     def generate_instructions(self, images):
         assert isinstance(images, list) and all([isinstance(image, NIC_Image) for image in images])
@@ -88,30 +89,30 @@ class PatchInstructionGenerator(NIC_InstructionGenerator):
             if isinstance(centers, tuple):  # Sampling that have two sets of centers
                 pos_centers, unif_centers = centers
                 pos_instructions = get_instructions_from_centers(image.id, pos_centers, self.in_shape, self.out_shape,
-                    augment_to=self.augment_positives, autodenoiser=self.autodenoiser)
+                                                                 augment_to=self.augment_positives, autoencoder=self.autoencoder)
                 unif_instructions = get_instructions_from_centers(image.id, unif_centers, self.in_shape, self.out_shape,
-                    augment_to=None, autodenoiser=self.autodenoiser)
+                                                                  augment_to=None, autoencoder=self.autoencoder)
                 image_instructions = pos_instructions + unif_instructions
             else:
                 image_instructions = get_instructions_from_centers(image.id, centers, self.in_shape, self.out_shape,
-                    augment_to=self.augment_positives, autodenoiser=self.autodenoiser)
+                                                                   augment_to=self.augment_positives, autoencoder=self.autoencoder)
             set_instructions += image_instructions
         printProgressBar(len(images), len(images), suffix='samples processed')
 
         return set_instructions
 
-def get_instructions_from_centers(sample_id, centers, patch_shape, output_shape, augment_to=None, autodenoiser=False):
+def get_instructions_from_centers(sample_id, centers, patch_shape, output_shape, augment_to=None, autoencoder=False):
     data_slices = get_patch_slices(centers, patch_shape)
     label_slices = get_patch_slices(centers, output_shape)
 
     sample_instructions = list()
     for data_slice, label_slice in zip(data_slices, label_slices):
-        if not autodenoiser:
+        if not autoencoder:
             instruction = PatchSegmentationInstruction(
                 sample_id=sample_id, data_patch_slice=data_slice, label_patch_slice=label_slice, normalise=True)
         else:
-            instruction = AutodenoiserInstruction(
-                sample_id=sample_id, data_patch_slice=data_slice, label_patch_slice=label_slice, normalise=True)
+            instruction = AutoencoderInstruction(
+                sample_id=sample_id, data_patch_slice=data_slice, label_patch_slice=label_slice, normalise=False)
         sample_instructions.append(instruction)
 
     if augment_to is not None:

@@ -21,4 +21,4 @@ class TrainingLogger:
             writer.writeheader()
             for epoch_params in self.epoch_params:
                 writer.writerow(epoch_params)
-
+            del writer

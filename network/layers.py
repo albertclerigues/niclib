@@ -1,6 +1,8 @@
+import copy
+
 import torch
 import torch.nn as nn
-
+import numpy as np
 from torch.distributions import Normal, Poisson
 
 class DropoutPrediction(nn.Module):
@@ -10,46 +12,62 @@ class DropoutPrediction(nn.Module):
         :param ndims:
         """
         super().__init__()
-        #self.Dropout = nn.Dropout2d if ndims is 2 else nn.Dropout3d
-        self.Dropout = nn.AlphaDropout
-        self.forever_inactive = inactive
 
+        self.channel_dropout = nn.Dropout2d if ndims is 2 else nn.Dropout3d
+        self.alpha_dropout = nn.AlphaDropout
+
+        self.forever_inactive = inactive
         self._running = False
-        self.d = self.Dropout(p=0.5)
+        self.d = self.channel_dropout(p=0.5)
 
     def forward(self, x_in):
-        if not self._running or self.forever_inactive:
-            self.d.eval()
-        else:
-            self.d.train()
+        if not self._running or self.forever_inactive: self.d.eval()
+        else: self.d.train()
 
         return self.d(x_in)
 
-    def activate(self, p_out=None):
+    def activate(self, p_out=None, dotype='channel'):
         self._running = True
-        if p_out is not None:
-            self.d = self.Dropout(p=p_out)
+        if dotype is 'channel':
+            self.d = self.channel_dropout(p=p_out)
+        elif dotype is 'alpha':
+            self.d = self.alpha_dropout(p=p_out)
+        else:
+            raise NotImplementedError
 
     def deactivate(self):
         self._running = False
+
+#import visdom
+#viz = visdom.Visdom()
+class LearnableAverage(torch.nn.Module):
+    def __init__(self, num_elements):
+        super().__init__()
+        self.input_weights = torch.nn.Parameter(torch.tensor([1.0 / num_elements] * num_elements))
+        self.X = torch.tensor([0.0])
+
+    def forward(self, input_list):
+        input_weighted = torch.stack(
+            [input_original * self.input_weights[i] for i, input_original in enumerate(input_list)], dim=0)
+        return torch.sum(input_weighted, dim=0) / torch.sum(self.input_weights)
+
+
+
 
 class CTNoiser(torch.nn.Module):
     """
     Module for additive CT image noise, a mixture of Gaussian and Poisson
     """
-    def __init__(self, device=torch.device('cuda')):
+    def __init__(self, mean, std, device=torch.device('cuda')):
         super().__init__()
         self.device = device
-
-        self.scale_normal = torch.nn.Parameter(torch.tensor(1.0))
-        self.normal_mean = torch.nn.Parameter(torch.tensor(0.0))
-        self.normal_std = torch.nn.Parameter(torch.tensor(1.0))
+        self.noise_distribution = Normal(loc=mean, scale=std)
 
     def forward(self, x_in):
-        normal_noise =  (Normal(0.0, 1.0).sample(x_in.size()).to(self.device) * self.normal_std) + self.normal_mean
-        return x_in + self.scale_normal * normal_noise
+        return x_in + self.noise_distribution.sample(x_in.size()).to(self.device)
 
-class CTNoiser_extended(torch.nn.Module):
+
+class CTNoiserParametric(torch.nn.Module):
     """
     Module for additive CT image noise, a mixture of Gaussian and Poisson
     """
@@ -57,19 +75,11 @@ class CTNoiser_extended(torch.nn.Module):
         super().__init__()
         self.device = device
 
-        self.scale_normal = torch.nn.Parameter(torch.tensor(0.01))
-        self.normal_mean = torch.nn.Parameter(torch.tensor(0.0))
-        self.normal_std = torch.nn.Parameter(torch.tensor(1.0))
-
-        # Here, this is an "emulated" poisson distribution approximated by a normal distribution
-        # The clamp constraints for positivity like in the poisson distribution
-        self.scale_poisson = torch.nn.Parameter(torch.tensor(0.01))
-        self.poisson_mean = torch.nn.Parameter(torch.tensor(0.0))
-        self.poisson_std = torch.nn.Parameter(torch.tensor(1.0))
+        self.normal_scale = torch.nn.Parameter(torch.tensor(np.abs(np.random.randn()*0.02)))
+        self.normal_mean = torch.nn.Parameter(torch.tensor(np.abs(np.random.rand()*0.02)))
+        self.normal_std = torch.nn.Parameter(torch.tensor(np.abs(np.random.rand()*0.05 + 0.05)))
 
     def forward(self, x_in):
-        normal_noise =  (Normal(0.0, 1.0).sample(x_in.size()).to(self.device) * self.normal_std) + self.normal_mean
-        poisson_emulated = (Normal(0.0, 1.0).sample(x_in.size()).to(self.device) * self.poisson_std) + self.poisson_mean
-        poisson_emulated = torch.clamp(poisson_emulated, min=0.0)
-        return x_in + self.scale_poisson * poisson_emulated + self.scale_normal * normal_noise
+        normal_noise = ((Normal(0.0, 1.0).sample(x_in.size()).to(self.device) * self.normal_std) + self.normal_mean)
+        return x_in + self.normal_scale * normal_noise
 

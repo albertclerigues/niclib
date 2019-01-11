@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 from scipy import ndimage
 from niclib.medpy_hausdorff import hd as haussdorf_dist
@@ -47,13 +49,13 @@ def compute_segmentation_metrics(y_true, y_pred, lesion_metrics=False, exclude=N
 
     tp, tn, fp, fn = compute_confusion_matrix(y_true, y_pred)
 
-    #Sensitivity and specificity
-    metrics['sens'] = tp / (tp + fn + eps)
-    metrics['spec'] = tn / (tn + fp + eps)
+    # Sensitivity and specificity
+    metrics['sens'] = tp / (tp + fn + eps) # Correct % of the real lesion
+    metrics['spec'] = tn / (tn + fp + eps) # Correct % of the healthy area identified
 
-    # Voxel Fractions
-    #metrics['tpf'] = metrics['sens']
-    metrics['fpf'] = 1 - metrics['spec']
+    # Predictive value
+    metrics['ppv'] = tp / (tp + fp + eps) # Of all lesion voxels, % of really lesion
+    metrics['npv'] = tn / (tn + fn + eps)  # Of all lesion voxels, % of really lesion
 
     # Lesion metrics
     if lesion_metrics:
@@ -64,16 +66,15 @@ def compute_segmentation_metrics(y_true, y_pred, lesion_metrics=False, exclude=N
         metrics['l_ppv'] = tpl / (tpl + fpl + eps)
         metrics['l_f1'] = (2.0 * metrics['l_ppv'] * metrics['l_tpf']) / (metrics['l_ppv'] + metrics['l_tpf'] + eps)
 
-    #Dice coefficient
+    # Dice coefficient
     metrics['dsc'] = dice_coef(y_true, y_pred)
-    # RELATIVE volume difference
+
+    # Relative volume difference
     metrics['avd'] = 2.0 * np.abs(np.sum(y_pred) - np.sum(y_true))/(np.sum(y_pred) + np.sum(y_true) + eps)
 
     # Haussdorf distance
-    try:
-        metrics['hd'] = haussdorf_dist(y_pred, y_true, connectivity=3)  # Why connectivity 3?
-    except Exception:
-        metrics['hd'] = np.nan
+    try: metrics['hd'] = haussdorf_dist(y_pred, y_true, connectivity=3)  # Why connectivity 3?
+    except Exception: metrics['hd'] = np.nan
 
     if exclude is not None:
         [metrics.pop(metric, None) for metric in exclude]

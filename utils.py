@@ -5,7 +5,11 @@ import sys
 import nibabel as nib
 import itertools as iter
 import datetime
-    
+
+def check_filename_chars(filename):
+    filename = filename.replace('.', ',')  # Avoid decimal points that could be confounded with extension .
+    filename = filename.replace(' ', '')  # Avoid spaces
+    return filename
 
 def get_formatted_timedate():
     time_format = "%Y-%m-%d_%H:%M:%S"

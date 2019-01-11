@@ -6,8 +6,8 @@ import itertools as iter
 from niclib.dataset import NIC_Image, NIC_Dataset
 
 
-class Isles2018(NIC_Dataset):
-    def __init__(self, dataset_path, num_volumes=(94, 62), modalities=('CT_SS', 'CT_CBF', 'CT_CBV', 'CT_MTT', 'CT_Tmax'), load_testing=True):
+class Isles2015_SISS(NIC_Dataset):
+    def __init__(self, dataset_path, num_volumes=(28, 36), modalities=('Flair', 'T1', 'T2', 'DWI'), load_testing=True):
         super().__init__()
         self.dataset_path = os.path.expanduser(dataset_path)
         self.num_volumes = num_volumes
@@ -20,8 +20,9 @@ class Isles2018(NIC_Dataset):
         modalities = self.modalities
         load_testing = self.load_testing
 
-        print("Loading ISLES2018 dataset with modalities {}...".format(modalities))
-        pattern = ['training/case_{}/', 'testing/case_{}/']
+        print("Loading ISLES2015 SISS dataset with modalities {}...".format(modalities))
+        pattern = ['training/{}/', 'testing/{}/']
+
         # Training loading
         for case_idx in range(num_volumes[0]):
             case_folder = os.path.join(dataset_path, pattern[0].format(str(case_idx + 1)))

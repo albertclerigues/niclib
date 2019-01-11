@@ -13,14 +13,23 @@ from niclib.io.metrics import print_metrics_list
 
 
 class SimpleCrossvalidation:
-    def __init__(self, model_definition, images, num_folds, model_trainer, train_instr_gen, val_instr_gen, checkpoint_pathfile, log_pathfile, test_predictor, results_path):
+    def __init__(self, model_definition, images, num_folds, model_trainer, train_instr_gen, val_instr_gen, checkpoint_pathfile, log_pathfile, test_predictor, results_path, fold_idxs=None, pretrained_pathfile=None, training_set='train'):
         assert isinstance(model_trainer, EarlyStoppingTrain)
         assert isinstance(train_instr_gen, PatchGeneratorBuilder)
         assert isinstance(val_instr_gen, PatchGeneratorBuilder)
 
         self.model_definition = model_definition
         self.images = images
+        self.training_set=training_set
         self.num_folds = num_folds
+        self.fold_idxs = fold_idxs
+
+        if pretrained_pathfile is not None:
+            if pretrained_pathfile.endswith('.pt'):
+                pretrained_pathfile, _ = os.path.splitext(pretrained_pathfile)
+            self.pretrained_pathfile = pretrained_pathfile + '_{}_to_{}.pt'
+        else:
+            self.pretrained_pathfile = None
 
         if checkpoint_pathfile.endswith('.pt'):
             checkpoint_pathfile, _ = os.path.splitext(checkpoint_pathfile)
@@ -42,23 +51,33 @@ class SimpleCrossvalidation:
     def run_crossval(self):
         print("\n" + "-" * 75 + "\n Running {}-fold crossvalidation \n".format(self.num_folds) + "-" * 75 + "\n", sep='')
 
-
-        for fold_idx in range(self.num_folds):
+        fold_idxs = self.fold_idxs if self.fold_idxs is not None else range(self.num_folds)
+        for fold_idx in fold_idxs:
             start_idx_val, stop_idx_val = get_crossval_indexes(
                 images=self.images, fold_idx=fold_idx, num_folds=self.num_folds)
 
             print("\n" + "-" * 50 +"\n Running fold {} - val images {} to {} \n".format(fold_idx, start_idx_val, stop_idx_val) + "-" * 50 + "\n", sep='')
 
-            model_fold = copy.deepcopy(self.model_definition)
+
+            if isinstance(self.model_definition, list):
+                model_fold = copy.deepcopy(self.model_definition[fold_idx])
+            else:
+                model_fold = copy.deepcopy(self.model_definition)
+
             train_images = self.images[:start_idx_val] + self.images[stop_idx_val:]
             val_images = self.images[start_idx_val:stop_idx_val]
 
-            print("Building training generator...")
+            print("Building training generator from {} images...".format(self.training_set))
             train_gen = self.train_instr_gen.build_patch_generator(images=train_images)
             print("Building validation generator...")
             val_gen = self.val_instr_gen.build_patch_generator(images=val_images)
             print("\nGenerators with {} training and {} validation patches".format(
                 len(train_gen)*self.trainer.bs, len(val_gen)*self.trainer.bs))
+
+            # If pretrained, load it
+            if self.pretrained_pathfile is not None:
+                print("Loading pre-trained model at: {}".format(self.pretrained_pathfile.format(start_idx_val, stop_idx_val)))
+                model_fold = torch.load(self.pretrained_pathfile.format(start_idx_val, stop_idx_val))
 
             model_filepath =  self.checkpoint_pathfile.format(start_idx_val, stop_idx_val)
             log_filepath = self.log_pathfile.format(start_idx_val, stop_idx_val)
@@ -68,6 +87,7 @@ class SimpleCrossvalidation:
             model_fold = torch.load(model_filepath, self.trainer.device)
 
             # Predict validation set
-            for n, sample in enumerate(val_images):
+            eval_images = val_images
+            for n, sample in enumerate(eval_images):
                 probs = self.predictor.predict_sample(model_fold, sample)
-                save_image_probs(self.results_path + '{}_probs.nii.gz'.format(sample.id), sample, probs)
+                save_image_probs(self.results_path + '{}_pred.nii.gz'.format(sample.id), sample, probs)

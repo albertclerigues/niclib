@@ -2,19 +2,26 @@ import torch
 import torch.nn.functional as F
 from abc import ABC, abstractmethod
 
+class NIC_InverseL1Loss(torch.nn.Module):
+    def forward(self, output, target):
+        l1_voxel = torch.mean(torch.abs(output - target), dim=1)
+        return 1.0 - (torch.mean(l1_voxel) / torch.max(l1_voxel))
+
+
 class NIC_autodenoiser_loss(torch.nn.Module):
     def __init__(self):
         super().__init__()
         #self.ND_loss_func = torch.nn.MSELoss()
         self.ND_loss_func = torch.nn.L1Loss()
         self.DS_loss_func = NIC_binary_xent_gdl(type_weight='Simple')
+        self.NI_loss_func = NIC_InverseL1Loss() # Zero noise error
 
     def forward(self, output_pack, target_pack):
-        if isinstance(output_pack, list) and isinstance(target_pack, list) and len(output_pack) == len(target_pack) == 2:
-            output_DS, output_ND = output_pack[0], output_pack[1]
+        if isinstance(output_pack, list) and isinstance(target_pack, list):
+            output_DS, output_ND, output_D = output_pack[0], output_pack[1], output_pack[2]
             target_DS, target_ND = target_pack[0], target_pack[1]
 
-            DS_loss = self.DS_loss_func(output_DS, target_DS)
+            DS_loss = 10.0 * self.DS_loss_func(output_DS, target_DS)
             ND_loss = self.ND_loss_func(output_ND, target_ND)
 
             return DS_loss + ND_loss
@@ -45,11 +52,6 @@ class NIC_crossentropyloss(torch.nn.Module):
         output = torch.log(torch.clamp(output, 1E-7, 1.0 - 1E-7))
         target = torch.squeeze(target, dim=1).long()
         return F.cross_entropy(output, target, weight=self.w)
-
-def nic_reg_l1_fft(output, target):
-    t_fft = torch.rfft(torch.round(output), len(output.shape) - 2, normalized=True)
-    l1 = torch.sum(torch.pow(torch.sum(torch.pow(t_fft, 2.0), dim=-1), 0.5)) / output.numel()
-    return l1
 
 def nic_binary_l1_er(y_pred, y_true):
     """
@@ -87,12 +89,12 @@ def nic_binary_kl_divergence(y_pred, y_true):
 def nic_binary_mseloss(y_pred, y_true):
     y_true_binary = torch.cat([torch.abs(y_true - 1.), y_true], dim=1).float()
     y_pred = torch.clamp(y_pred, 1E-7, 1. - 1E-7)
-    return F.mse_loss(y_pred, y_true_binary, reduction='elementwise_mean')
+    return F.mse_loss(y_pred, y_true_binary)
 
 def nic_binary_l1loss(y_pred, y_true):
     y_true_binary = torch.cat([torch.abs(y_true - 1.), y_true], dim=1).float()
     y_pred = torch.clamp(y_pred, 1E-7, 1. - 1E-7)
-    return F.l1_loss(y_pred, y_true_binary, reduction='elementwise_mean')
+    return F.l1_loss(y_pred, y_true_binary)
 
 def nic_binary_bceloss(y_pred, y_true):
     """
@@ -100,7 +102,7 @@ def nic_binary_bceloss(y_pred, y_true):
     """
     y_true_binary = torch.cat([torch.abs(y_true - 1.0), y_true], dim=1).float()
     y_pred = torch.clamp(y_pred, min=1E-7, max=1.0 - 1E-7)
-    return F.binary_cross_entropy(y_pred, y_true_binary, reduction='elementwise_mean')
+    return F.binary_cross_entropy(y_pred, y_true_binary)
 
 def nic_binary_accuracy(y_pred, y_true, class_dim=1):
     """
@@ -115,7 +117,6 @@ def nic_binary_error_rate(y_pred, y_true, class_dim=1):
 
 def nic_lesion_dice_loss(y_pred, y_true, smooth=100.0):
     y_pred = y_pred[:, 1, ...].unsqueeze(1) # only lesion probabilities
-
     dice_numerator = 2.0 * torch.sum(y_pred * y_true, dim=1)
     dice_denominator = torch.sum(y_pred, dim=1) + torch.sum(y_true, dim=1)
     dice_score = (dice_numerator + smooth) / (dice_denominator + smooth)
@@ -215,7 +216,7 @@ class NIC_binary_asymsimilarity_loss(torch.nn.Module):
 
     def forward(self, output, target):
         target = torch.squeeze(target, dim=1)
-        output = torch.clamp(output[:, 1, ...], min=1E-7, max=1.0 - 1E-7)
+        output = torch.clamp(output[:, 1, ...], min=1E-7, max=1.0)
 
         b2, b2_1 = torch.pow(self.b, 2.0), torch.pow(self.b, 2.0) + 1.0
 
@@ -237,7 +238,7 @@ class NIC_binary_focal_loss(torch.nn.Module):
         self.a = alpha
 
     def forward(self, y_pred, y_true):
-        y_true_bin = torch.cat([torch.abs(y_true - 1.0), y_true], dim=1).float()
+        y_true_bin = torch.cat([1.0 - y_true, y_true], dim=1).float()
         y_pred = torch.clamp(y_pred, min=1E-7, max=1.0 - 1E-7)
 
         mask0, mask1  = y_true_bin[:, 0, ...], y_true_bin[:, 1, ...] # background mask (is 1 if bg, 0 if fg)

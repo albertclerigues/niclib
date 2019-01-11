@@ -4,23 +4,15 @@ import torch.nn.functional as F
 
 import numpy as np
 
+from niclib.architecture import NIC_Architecture
 from niclib.network.layers import DropoutPrediction
 
 INIT_PRELU = 0.0
 BN_MOMENTUM = 0.01
 
-def init_weights(m):
-    classname = m.__class__.__name__
-    if 'Conv' in classname:
-        nn.init.xavier_uniform_(m.weight)
-        nn.init.constant_(m.bias, 0)
-    elif 'BatchNorm' in classname:
-        nn.init.constant_(m.weight, 1)
-        nn.init.constant_(m.bias, 0)
 
-
-class SUNETx4(nn.Module):
-    def __init__(self, in_ch=5, out_ch=2, nfilts=32, ndims=3, softmax_out=True):
+class SUNETx4(NIC_Architecture):
+    def __init__(self, in_ch=5, out_ch=2, nfilts=32, ndims=3, softmax_out=True, dropout_rate=0.2):
         super(SUNETx4, self).__init__()
         Conv = nn.Conv2d if ndims is 2 else nn.Conv3d
         ConvTranspose = nn.ConvTranspose2d if ndims is 2 else nn.ConvTranspose3d
@@ -28,9 +20,9 @@ class SUNETx4(nn.Module):
         self.inconv = Conv(in_ch, 1 * nfilts, 3, padding=1)
 
         self.dual1 = DualRes(1 * nfilts, ndims)
-        self.dual2 = DualRes(2 * nfilts, ndims, dropout_prediction=True)
-        self.dual3 = DualRes(4 * nfilts, ndims, dropout_prediction=True)
-        self.dual4 = DualRes(8 * nfilts, ndims, dropout_rate=0.1, dropout_prediction=True)
+        self.dual2 = DualRes(2 * nfilts, ndims, dropout_rate=dropout_rate, dropout_prediction=True)
+        self.dual3 = DualRes(4 * nfilts, ndims, dropout_rate=dropout_rate, dropout_prediction=True)
+        self.dual4 = DualRes(8 * nfilts, ndims, dropout_rate=dropout_rate, dropout_prediction=True)
 
         self.down1 = DownStep(1 * nfilts, ndims)
         self.down2 = DownStep(2 * nfilts, ndims)
@@ -49,22 +41,9 @@ class SUNETx4(nn.Module):
         self.do_softmax = softmax_out
         self.softmax = nn.Softmax(dim=1) # Channels dimension
 
-        self.apply(init_weights)
         model_parameters = filter(lambda p: p.requires_grad, self.parameters())
         nparams = sum([np.prod(p.size()) for p in model_parameters])
-        print("SUNETx4 network with {} parameters".format(nparams))
-
-    def activate_dropout_testing(self, p_out):
-        def activate_dropout(m):
-            if isinstance(m, DropoutPrediction):
-                m.activate(p_out)
-        self.apply(activate_dropout)
-
-    def deactivate_dropout_testing(self):
-        def deactivate_dropout(m):
-            if isinstance(m, DropoutPrediction):
-                m.deactivate()
-        self.apply(deactivate_dropout)
+        print("SUNETx4_{}D_f{} network with {} parameters".format(ndims, nfilts, nparams))
 
     def forward(self, x_in):
         l1_start = self.inconv(x_in)
@@ -99,8 +78,8 @@ class SUNETx4(nn.Module):
         return pred
 
 
-class SUNETx5(nn.Module):
-    def __init__(self, in_ch=5, out_ch=2, nfilts=32, ndims=3):
+class SUNETx5(NIC_Architecture):
+    def __init__(self, in_ch=5, out_ch=2, nfilts=32, ndims=3, dropout_rate=0.2):
         super(SUNETx5, self).__init__()
         Conv = nn.Conv2d if ndims is 2 else nn.Conv3d
         ConvTranspose = nn.ConvTranspose2d if ndims is 2 else nn.ConvTranspose3d
@@ -109,9 +88,9 @@ class SUNETx5(nn.Module):
 
         self.dual1 = DualRes(1 * nfilts, ndims)
         self.dual2 = DualRes(2 * nfilts, ndims)
-        self.dual3 = DualRes(4 * nfilts, ndims, dropout_prediction=True)
-        self.dual4 = DualRes(8 * nfilts, ndims, dropout_prediction=True)
-        self.dual5 = DualRes(16 * nfilts, ndims, dropout_rate=0.1, dropout_prediction=True)
+        self.dual3 = DualRes(4 * nfilts, ndims, dropout_rate=dropout_rate, dropout_prediction=True)
+        self.dual4 = DualRes(8 * nfilts, ndims, dropout_rate=dropout_rate, dropout_prediction=True)
+        self.dual5 = DualRes(16 * nfilts, ndims, dropout_rate=dropout_rate, dropout_prediction=True)
 
         self.down1 = DownStep(1 * nfilts, ndims)
         self.down2 = DownStep(2 * nfilts, ndims)
@@ -131,10 +110,9 @@ class SUNETx5(nn.Module):
         self.outconv = Conv(nfilts, out_ch, 3, padding=1)
         self.softmax = nn.Softmax(dim=1) # Channels dimension
 
-        self.apply(init_weights)
         model_parameters = filter(lambda p: p.requires_grad, self.parameters())
         nparams = sum([np.prod(p.size()) for p in model_parameters])
-        print("SUNETx5 network with {} parameters".format(nparams))
+        print("SUNETx5_{}D_f{} network with {} parameters".format(ndims, nfilts, nparams))
 
     def forward(self, x_in):
         l1_start = self.inconv(x_in)
@@ -177,7 +155,6 @@ class SUNETx5(nn.Module):
 class DualRes(nn.Module):
     def __init__(self, num_ch, ndims=3, dropout_rate=0.0, dropout_prediction=False):
         super(DualRes, self).__init__()
-
         Conv = nn.Conv2d if ndims is 2 else nn.Conv3d
         BatchNorm = nn.BatchNorm2d if ndims is 2 else nn.BatchNorm3d
         Dropout = nn.Dropout2d if ndims is 2 else nn.Dropout3d
@@ -193,16 +170,15 @@ class DualRes(nn.Module):
             Conv(num_ch, num_ch, 3, padding=1))
 
     def forward(self, x_in):
-        x_out = self.conv_path(x_in) + x_in
-        return x_out
+        return self.conv_path(x_in) + x_in
 
 
 class MonoRes(nn.Module):
     def __init__(self, num_ch, ndims=3, dropout_prediction=False):
         super(MonoRes, self).__init__()
-
         Conv = nn.Conv2d if ndims is 2 else nn.Conv3d
         BatchNorm = nn.BatchNorm2d if ndims is 2 else nn.BatchNorm3d
+
         self.conv_path = nn.Sequential(
             DropoutPrediction(inactive=not dropout_prediction),
             BatchNorm(num_ch, momentum=BN_MOMENTUM, eps=0.001),
@@ -217,12 +193,11 @@ class MonoRes(nn.Module):
 class DownStep(nn.Module):
     def __init__(self, in_ch, ndims=3):
         super(DownStep, self).__init__()
-
         MaxPool = nn.MaxPool2d if ndims is 2 else nn.MaxPool3d
-        self.pool_path = MaxPool(2)
-
         Conv = nn.Conv2d if ndims is 2 else nn.Conv3d
         BatchNorm = nn.BatchNorm2d if ndims is 2 else nn.BatchNorm3d
+
+        self.pool_path = MaxPool(2)
         self.conv_path = nn.Sequential(
             BatchNorm(in_ch, momentum=BN_MOMENTUM, eps=0.001),
             nn.PReLU(in_ch, init=INIT_PRELU),
