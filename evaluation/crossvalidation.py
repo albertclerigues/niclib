@@ -13,14 +13,13 @@ from niclib.io.metrics import print_metrics_list
 
 
 class SimpleCrossvalidation:
-    def __init__(self, model_definition, images, num_folds, model_trainer, train_instr_gen, val_instr_gen, checkpoint_pathfile, log_pathfile, test_predictor, results_path, fold_idxs=None, pretrained_pathfile=None, training_set='train'):
+    def __init__(self, model_definition, images, num_folds, model_trainer, train_instr_gen, val_instr_gen, checkpoint_pathfile, log_pathfile, test_predictor, results_path, fold_idxs=None, pretrained_pathfile=None):
         assert isinstance(model_trainer, EarlyStoppingTrain)
         assert isinstance(train_instr_gen, PatchGeneratorBuilder)
         assert isinstance(val_instr_gen, PatchGeneratorBuilder)
 
         self.model_definition = model_definition
         self.images = images
-        self.training_set=training_set
         self.num_folds = num_folds
         self.fold_idxs = fold_idxs
 
@@ -67,7 +66,7 @@ class SimpleCrossvalidation:
             train_images = self.images[:start_idx_val] + self.images[stop_idx_val:]
             val_images = self.images[start_idx_val:stop_idx_val]
 
-            print("Building training generator from {} images...".format(self.training_set))
+            print("Building training generator from {} images...".format('training'))
             train_gen = self.train_instr_gen.build_patch_generator(images=train_images)
             print("Building validation generator...")
             val_gen = self.val_instr_gen.build_patch_generator(images=val_images)

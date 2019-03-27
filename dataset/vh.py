@@ -6,7 +6,7 @@ import itertools as iter
 from niclib.dataset import NIC_Image, NIC_Dataset
 
 class VH(NIC_Dataset):
-    def __init__(self, dataset_path, load_synth=False, load_test=True):
+    def __init__(self, dataset_path, load_test=True, symmetric_modalities=False):
         super().__init__()
 
         self.dataset_path = os.path.expanduser(dataset_path)
@@ -18,14 +18,15 @@ class VH(NIC_Dataset):
         self.test_names = ['VPI01_0', 'VPI03_0', 'VPI05_0', 'VPI07_0', 'VPI10_0', 'VPL02_0_COP', 'VPL04_0_COP',
                            'VPI02_0', 'VPI04_0', 'VPI06_0', 'VPI08_0', 'VPL01_0_AVX', 'VPL03_0_COP', 'VPL06_0_RBF']
 
-        self.do_load_synth = load_synth
-        self.modalities = ['FLAIR', 'T1']
-        self.modalities_synth = ['FLAIR_syn', 'T1_syn']
 
+        self.modalities = ['FLAIR', 'T1']
+        if symmetric_modalities:
+            self.modalities += ['sym_{}'.format(mod) for mod in self.modalities]
+            print(self.modalities)
 
     def load(self):
         dataset_path = self.dataset_path
-        modalities = self.modalities if not self.do_load_synth else self.modalities_synth
+        modalities = self.modalities
 
         print("Loading VH_synth dataset with modalities {}...".format(modalities))
 
@@ -47,7 +48,7 @@ class VH(NIC_Dataset):
                     initialized = True
                 image_data[m_idx] = vol
 
-            labels[0] = nib.load(case_folder + 'lesionMask.nii.gz').get_data()
+            labels[0] = nib.load(case_folder + 'lesionMask.nii.gz').get_data() > 0.0
 
             sample = NIC_Image(
                 sample_id=case_name,

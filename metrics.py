@@ -106,6 +106,14 @@ def compute_avg_std_metrics_list(metrics_list):
 
 
 
+def compute_clinical_metrics(y_true, y_pred):
+
+    vol_true, vol_pred = np.sum(y_true), np.sum(y_pred)
+
+    np.polyfit(x, y, deg)
+
+    pass
+
 
 
 

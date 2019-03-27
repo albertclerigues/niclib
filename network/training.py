@@ -228,10 +228,11 @@ class EarlyStoppingTrain:
                 epoch_test_metrics = self.test_epoch(model, val_gen)
 
                 # Log epoch results
-                now = datetime.datetime.now()
-                basic_params = {'Epoch': self.current_epoch, 'Date': now.strftime("%Y-%m-%d"), 'Time':now.strftime('%H:%M:%S')}
-                self.train_logger.add_epoch_params({**basic_params, **epoch_train_metrics, **epoch_test_metrics})
-                self.train_logger.write_to_csv(log_filepath)
+                if log_filepath is not None:
+                    now = datetime.datetime.now()
+                    basic_params = {'Epoch': self.current_epoch, 'Date': now.strftime("%Y-%m-%d"), 'Time':now.strftime('%H:%M:%S')}
+                    self.train_logger.add_epoch_params({**basic_params, **epoch_train_metrics, **epoch_test_metrics})
+                    self.train_logger.write_to_csv(log_filepath)
 
                 monitored_metric_value = epoch_test_metrics['val_{}'.format(self.early_stopping_metric)]
                 if best_metric['value'] - monitored_metric_value > self.min_delta:

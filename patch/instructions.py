@@ -27,8 +27,8 @@ class NIC_InstructionGenerator(ABC):
 
 
 class PatchSegmentationInstruction(NIC_Instruction):
-    def __init__(self, sample_id=-1, data_patch_slice=None, label_patch_slice=None, augment_func=None, normalise=True):
-        self.sample_id = sample_id
+    def __init__(self, case_id=-1, data_patch_slice=None, label_patch_slice=None, augment_func=None, normalise=True):
+        self.case_id = case_id
 
         self.data_patch_slice = data_patch_slice
         self.label_patch_slice = label_patch_slice
@@ -38,9 +38,9 @@ class PatchSegmentationInstruction(NIC_Instruction):
 
     def extract_from(self, images):
         # Obtain image from list
-        sample = NIC_Dataset.get_by_id(self.sample_id, images) if isinstance(images, list) else images
+        sample = NIC_Dataset.get_by_id(self.case_id, images) if isinstance(images, list) else images
         assert isinstance(sample, NIC_Image)
-        assert self.sample_id == sample.id
+        assert self.case_id == sample.id
 
         # Extract patches
         data_patch = extract_patch_with_slice(sample.data, self.data_patch_slice)
@@ -75,7 +75,6 @@ class PatchInstructionGenerator(NIC_InstructionGenerator):
         self.out_shape = out_shape
         self.sampler = sampler
         self.augment_positives = augment_to
-
         self.autoencoder = autoencoder
 
     def generate_instructions(self, images):
@@ -88,11 +87,11 @@ class PatchInstructionGenerator(NIC_InstructionGenerator):
             centers = self.sampler.get_centers(image)
             if isinstance(centers, tuple):  # Sampling that have two sets of centers
                 pos_centers, unif_centers = centers
-                pos_instructions = get_instructions_from_centers(image.id, pos_centers, self.in_shape, self.out_shape,
+                lesion_instructions = get_instructions_from_centers(image.id, pos_centers, self.in_shape, self.out_shape,
                                                                  augment_to=self.augment_positives, autoencoder=self.autoencoder)
                 unif_instructions = get_instructions_from_centers(image.id, unif_centers, self.in_shape, self.out_shape,
                                                                   augment_to=None, autoencoder=self.autoencoder)
-                image_instructions = pos_instructions + unif_instructions
+                image_instructions = lesion_instructions + unif_instructions
             else:
                 image_instructions = get_instructions_from_centers(image.id, centers, self.in_shape, self.out_shape,
                                                                    augment_to=self.augment_positives, autoencoder=self.autoencoder)
@@ -109,7 +108,7 @@ def get_instructions_from_centers(sample_id, centers, patch_shape, output_shape,
     for data_slice, label_slice in zip(data_slices, label_slices):
         if not autoencoder:
             instruction = PatchSegmentationInstruction(
-                sample_id=sample_id, data_patch_slice=data_slice, label_patch_slice=label_slice, normalise=True)
+                case_id=sample_id, data_patch_slice=data_slice, label_patch_slice=label_slice, normalise=True)
         else:
             instruction = AutoencoderInstruction(
                 sample_id=sample_id, data_patch_slice=data_slice, label_patch_slice=label_slice, normalise=False)

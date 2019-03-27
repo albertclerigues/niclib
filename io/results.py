@@ -42,6 +42,8 @@ def load_result_set(result_path, original_images, filename_gen=None, result_type
     assert all([isinstance(img, NIC_Image) for img in original_images])
     #assert isinstance(filename_gen, ResultFilenameGenerator)
 
+    print("Loading result set with template filepath: {}".format(result_path))
+
     result_set = dict()
     for i, image in enumerate(original_images):
         # TODO use filename generators

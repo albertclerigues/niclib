@@ -7,12 +7,17 @@ from niclib.dataset import NIC_Image, NIC_Dataset
 
 
 class Isles2017(NIC_Dataset):
-    def __init__(self, dataset_path, num_volumes=(43, 32), modalities=('ADC', 'CBF', 'CBV', 'MTT', 'Tmax', 'TTP'), load_testing=True):
+    def __init__(self, dataset_path, num_volumes=(43, 32), modalities=('ADC', 'CBF', 'CBV', 'MTT', 'Tmax', 'TTP'), load_testing=True, symmetric_modalities=False, additional_modalities=None):
         super().__init__()
         self.dataset_path = os.path.expanduser(dataset_path)
         self.num_volumes = num_volumes
         self.modalities = modalities
+        if symmetric_modalities:
+            self.modalities = tuple(list(self.modalities) + ['sym_{}'.format(mod) for mod in modalities])
+        if additional_modalities is not None:
+            self.modalities = tuple(list(self.modalities) + additional_modalities)
         self.load_testing = load_testing
+
 
     def load(self):
         dataset_path = self.dataset_path
@@ -59,6 +64,9 @@ class Isles2017(NIC_Dataset):
             return
 
         for case_idx in range(num_volumes[1]):
+            if case_idx + 1 not in {17, 21}:
+                continue
+
             case_folder = os.path.join(dataset_path, pattern[1].format(str(case_idx + 1)))
 
             initialized, image_data, labels, nib_nifty = False, None, None, None

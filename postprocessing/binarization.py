@@ -42,9 +42,9 @@ class ThreshSizeBinarizer(Binarizer):
             y_prob_labelled[np.isin(y_prob_labelled, lesions_to_ignore)] = 0
 
         # Generate binary mask and return
-        y_pred = (y_prob_labelled > 0).astype('uint8')
+        y_binary = (y_prob_labelled > 0).astype('uint8')
 
-        return y_pred
+        return y_binary
 
 def thresh_size_search_single(result_set, images, thresholds, lesion_sizes, compute_lesion_metrics=False):
     true_vols, prob_vols = [], []
@@ -121,3 +121,37 @@ def thresh_size_search(result_set, images, thresholds, lesion_sizes, compute_les
     printProgressBar(len(thresholds) * len(lesion_sizes), len(thresholds) * len(lesion_sizes),
                      suffix=" parameters evaluated")
     return metrics_list, metrics_names
+
+def compute_set_metrics_dict(result_set_dict, images, thresh, lesion_size, compute_lesion_metrics=False):
+    true_vols, prob_vols = [], []
+    for img in images:
+        true_vols.append(img.labels[0])
+        prob_vols.append(result_set_dict[img.id] if img.id in result_set_dict else None)
+
+    # Generate result filename and try to load_samples results
+    threads = []
+    metrics_iter = [None] * len(prob_vols)
+    for sample_idx, (lesion_probs, true_vol) in enumerate(zip(prob_vols, true_vols)):
+        if lesion_probs is None:
+            continue
+
+        process = Thread(target=process_sample_metrics,
+                         args=[true_vol, lesion_probs, thresh, lesion_size, compute_lesion_metrics, metrics_iter,
+                               sample_idx])
+        process.start()
+        threads.append(process)
+    # Ensure every volume has been processed and remove none entries from results
+    for process in threads:
+        process.join()
+
+
+    # Format resulting metrics with id
+    metrics_dict = dict()
+    for n, metrics in enumerate(metrics_iter):
+        if metrics is None:
+            continue
+
+        assert images[n].id in result_set_dict
+        metrics_dict.update({images[n].id: metrics})
+
+    return metrics_dict

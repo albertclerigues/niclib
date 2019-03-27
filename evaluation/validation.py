@@ -47,6 +47,7 @@ class SimpleValidation:
 
         model_fold = copy.deepcopy(self.model_definition)
         if self.pretrained_pathfile is not None:
+            print("Loading pre-trained model at {}".format(self.pretrained_pathfile))
             model_fold = torch.load(self.pretrained_pathfile)
 
         train_images = self.images[:start_idx_val] + self.images[stop_idx_val:]

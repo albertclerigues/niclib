@@ -49,7 +49,7 @@ class NIC_crossentropyloss(torch.nn.Module):
         self.w = torch.tensor(weights).to(device)
 
     def forward(self, output, target):
-        output = torch.log(torch.clamp(output, 1E-7, 1.0 - 1E-7))
+        output = torch.log(torch.clamp(output, 1E-7, 1.0))
         target = torch.squeeze(target, dim=1).long()
         return F.cross_entropy(output, target, weight=self.w)
 
@@ -61,7 +61,7 @@ def nic_binary_l1_er(y_pred, y_true):
 
 def nic_binary_crossentropy(y_pred, y_true):
     y_true_binary = torch.cat([torch.abs(y_true - 1), y_true], dim=1).float()
-    y_pred = torch.clamp(y_pred, 1E-7, 1. - 1E-7)
+    y_pred = torch.clamp(y_pred, 1E-7, 1.0)
     return torch.mean(-torch.sum(y_true_binary * torch.log(y_pred), dim=1))
 
 def nic_binary_hinge(y_pred, y_true):
@@ -227,10 +227,10 @@ class NIC_binary_asymsimilarity_loss(torch.nn.Module):
         return torch.div(num, den)
 
 class NIC_binary_focal_loss(torch.nn.Module):
-    def __init__(self, gamma=2., alpha=0.25):
+    def __init__(self, gamma=2.0, alpha=0.25):
         """
         Constructor for the binary focal loss
-        :param gamma:
+        :param gamma
         :param alpha: alpha is weight for class 0 (background)
         """
         super().__init__()

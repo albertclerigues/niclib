@@ -7,11 +7,17 @@ from niclib.dataset import NIC_Image, NIC_Dataset
 
 
 class Isles2015_SISS(NIC_Dataset):
-    def __init__(self, dataset_path, num_volumes=(28, 36), modalities=('Flair', 'T1', 'T2', 'DWI'), load_testing=True):
+    def __init__(self, dataset_path, num_volumes=(28, 36), modalities=('Flair', 'T1', 'T2', 'DWI'), load_testing=True, symmetric_modalities=False, additional_modalities=None):
         super().__init__()
         self.dataset_path = os.path.expanduser(dataset_path)
         self.num_volumes = num_volumes
+
         self.modalities = modalities
+        if symmetric_modalities:
+            self.modalities = tuple(list(self.modalities) + ['sym_{}'.format(mod) for mod in modalities])
+        if additional_modalities is not None:
+            self.modalities = tuple(list(self.modalities) + additional_modalities)
+
         self.load_testing = load_testing
 
     def load(self):
@@ -28,9 +34,8 @@ class Isles2015_SISS(NIC_Dataset):
             case_folder = os.path.join(dataset_path, pattern[0].format(str(case_idx + 1)))
 
             initialized, image_data, labels, nib_nifty = False, None, None, None
-            for m_idx, modality in enumerate(modalities):
+            for mod_idx, modality in enumerate(modalities):
                 filepath = case_folder + '{}.nii'.format(modality)
-
                 try:
                     nib_file = nib.load(filepath)
                 except Exception as e:
@@ -43,7 +48,7 @@ class Isles2015_SISS(NIC_Dataset):
                     nib_nifty = nib_file
                     labels = np.zeros((1,) + vol.shape)
                     initialized = True
-                image_data[m_idx] = vol
+                image_data[mod_idx] = vol
             labels[0] = nib.load(case_folder + 'OT.nii').get_data()
 
             sample = NIC_Image(
@@ -59,10 +64,13 @@ class Isles2015_SISS(NIC_Dataset):
             return
 
         for case_idx in range(num_volumes[1]):
+            if case_idx + 1 not in {17, 31, 34}:
+                continue
+
             case_folder = os.path.join(dataset_path, pattern[1].format(str(case_idx + 1)))
 
             initialized, image_data, labels, nib_nifty = False, None, None, None
-            for m_idx, modality in enumerate(modalities):
+            for mod_idx, modality in enumerate(modalities):
                 filepath = case_folder + '{}.nii'.format(modality)
 
                 try: nib_file = nib.load(filepath)
@@ -74,7 +82,7 @@ class Isles2015_SISS(NIC_Dataset):
                     image_data = np.zeros((len(modalities),) + vol.shape)
                     nib_nifty = nib_file
                     initialized = True
-                image_data[m_idx] = vol
+                image_data[mod_idx] = vol
 
             sample = NIC_Image(
                 sample_id=case_idx + 1,

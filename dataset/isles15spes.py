@@ -7,11 +7,15 @@ from niclib.dataset import NIC_Image, NIC_Dataset
 
 
 class Isles2015_SPES(NIC_Dataset):
-    def __init__(self, dataset_path, num_volumes=(30, 20), modalities=('DWI', 'CBF', 'CBV', 'T1c', 'T2', 'Tmax', 'TTP'), load_testing=True):
+    def __init__(self, dataset_path, num_volumes=(30, 20), modalities=('DWI', 'CBF', 'CBV', 'T1c', 'T2', 'Tmax', 'TTP'), load_testing=True, symmetric_modalities=False, additional_modalities=None):
         super().__init__()
         self.dataset_path = os.path.expanduser(dataset_path)
         self.num_volumes = num_volumes
         self.modalities = modalities
+        if symmetric_modalities:
+            self.modalities = tuple(list(self.modalities) + ['sym_{}'.format(mod) for mod in modalities])
+        if additional_modalities is not None:
+            self.modalities = tuple(list(self.modalities) + additional_modalities)
         self.load_testing = load_testing
 
     def load(self):

@@ -49,7 +49,7 @@ def sample_uniform_patch_centers(patch_shape, extraction_step, volume_foreground
 
 def sample_positive_patch_centers(labels_volume):
     if len(labels_volume.shape) > 3:
-        labels_volume = labels_volume[0] # Select modality 0
+        labels_volume = labels_volume[0, ...] # Select modality 0
 
     pos_centers = np.where(labels_volume == 1)
 
@@ -63,7 +63,9 @@ def sample_positive_patch_centers(labels_volume):
 
 
 def randomly_offset_centers(centers, offset_shape, patch_shape, vol_foreground):
-    ### Offset patches to avoid location bias
+    ### If provided offset is all zeros, just skip
+    if np.sum(np.abs(offset_shape)) == 0:
+        return centers
 
     # Create offset matrix
     center_offsets = 2.0 * (np.random.rand(centers.shape[0], centers.shape[1]) - 0.5)  # generate uniform sampling between -1 and 1
@@ -82,19 +84,42 @@ def randomly_offset_centers(centers, offset_shape, patch_shape, vol_foreground):
 
 
 
-def resample_centers(centers, min_samples=None, max_samples=None):
-    resampled_idxs = None
-    if min_samples is not None:
-        if centers.shape[0] < min_samples:
-            resampled_idxs = get_resampling_indexes(centers.shape[0], min_samples)
+def resample_centers(centers, min_samples=None, max_samples=None, random=False):
+    # TODO make more elegant code
 
-    if max_samples is not None:
-        if centers.shape[0] > max_samples:
-            resampled_idxs = get_resampling_indexes(centers.shape[0], max_samples)
+    if random is False:
+        # UNIFORM CASE (DEFAULT)
+        resampled_idxs = None
+        if min_samples is not None:
+            if centers.shape[0] < min_samples:
+                resampled_idxs = get_resampling_indexes(centers.shape[0], min_samples)
 
-    if resampled_idxs is not None:  # Perform resampling
-        resampled_idxs = np.asarray(resampled_idxs, dtype=np.int)
-        centers = centers[resampled_idxs]
+        if max_samples is not None:
+            if centers.shape[0] > max_samples:
+                resampled_idxs = get_resampling_indexes(centers.shape[0], max_samples)
+
+        if resampled_idxs is not None:  # Perform resampling
+            resampled_idxs = np.asarray(resampled_idxs, dtype=np.int)
+            centers = centers[resampled_idxs]
+    else:
+        # RANDOM CASE
+
+        # Case min is specified
+        resampled_idxs = None
+        if min_samples is not None:
+            if centers.shape[0] < min_samples:
+                resampled_idxs = np.mod(np.arange(min_samples), len(centers))
+
+        # Case max is specified
+        if max_samples is not None:
+            if centers.shape[0] > max_samples:
+                resampled_idxs = np.random.permutation(centers.shape[0])[:max_samples]
+
+
+        # Perform resampling
+        if resampled_idxs is not None:
+            resampled_idxs = np.asarray(resampled_idxs, dtype=np.int)
+            centers = centers[resampled_idxs]
 
     return centers
 

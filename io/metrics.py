@@ -1,3 +1,17 @@
+def print_metrics_dict(metrics_dict):
+    metrics_names, metrics_list = [], []
+    for k, v in metrics_dict.items():
+        metrics_names.append(k)
+        metrics_list.append(v)
+    print_metrics_list(metrics_list, metrics_names)
+
+def save_metrics_dict(filepath, metrics_dict):
+    metrics_names, metrics_list = [], []
+    for k, v in metrics_dict.items():
+        metrics_names.append(k)
+        metrics_list.append(v)
+    save_metrics_list(filepath, metrics_list, metrics_names)
+
 
 def print_metrics_list(metrics_list, case_names=None):
     if type(metrics_list) is not list:

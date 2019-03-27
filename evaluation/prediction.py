@@ -10,6 +10,8 @@ from niclib.network.generator import PatchGeneratorBuilder
 from niclib.volume import zeropad_sample, remove_zeropad_volume
 
 from niclib.io.terminal import printProgressBar
+from niclib.network.training import ElapsedTimeEstimator
+
 
 class NIC_Predictor(ABC):
     @abstractmethod
@@ -58,8 +60,10 @@ class PatchPredictor(NIC_Predictor):
                 self.uncertainty_passes = 1
 
         with torch.no_grad():  # Turns off autograd (faster exec)
+            eta = ElapsedTimeEstimator(total_iters=len(sample_generator))
             for batch_idx, (x, y) in enumerate(sample_generator):
-                printProgressBar(batch_idx, len(sample_generator), suffix=' patches predicted')
+                printProgressBar(batch_idx, len(sample_generator),
+                                 suffix=' patches predicted - ETA {}'.format(eta.update(batch_idx + 1)))
 
                 # Send generated x,y batch to GPU
                 if isinstance(x, list):
@@ -92,7 +96,7 @@ class PatchPredictor(NIC_Predictor):
                 for patch_pred, patch_instruction in zip(y_pred, batch_instructions):
                     voting_img[patch_instruction.data_patch_slice] += patch_pred
                     counting_img[patch_instruction.data_patch_slice] += np.ones_like(patch_pred)
-            printProgressBar(len(sample_generator), len(sample_generator), suffix=' patches predicted')
+            printProgressBar(len(sample_generator), len(sample_generator), suffix=' patches predicted - {} s.'.format(eta.get_elapsed_time()))
 
         if self.uncertainty_passes > 1:
             model.deactivate_dropout_testing()
