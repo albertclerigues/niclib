@@ -1,132 +1,115 @@
-import time
-
 import numpy as np
-from scipy import ndimage
-from niclib.medpy_hausdorff import hd as haussdorf_dist
+from niclib2.medpy_hausdorff import hd as haussdorf_dist
 
-def compute_confusion_matrix(y_true, y_pred):
+def compute_metrics(outputs, targets, metrics, ids=None):
     """
-    Returns tuple tp, tn, fp, fn
+    Computes evaluation metrics for the given images.
+
+    :param outputs: list of output images
+    :param targets: list of gold standard images
+    :param metrics: dictionary containing the functions for metric computation
+    :param ids: (Optional) list of image pair identifiers
+    :return: list of dictionaries containing the metrics for each given sample pair
+    """
+    assert len(outputs) == len(targets)
+    assert isinstance(metrics, dict)
+
+    all_metrics = []
+    for n, (output, target) in enumerate(zip(outputs, targets)):
+        case_metrics = {}
+        case_metrics.update({'id': str(n) if ids is None else ids[n]})
+
+        for metric_name, metric_func in metrics.items():
+            metric_value = metric_func(output, target)
+            case_metrics.update({metric_name: metric_value} if not isinstance(metric_value, dict) else metric_value)
+        all_metrics.append(case_metrics)
+    return all_metrics
+
+def compute_confusion_matrix(output, target):
+    """
+    Returns tuple (true_pos, true_neg, false_pos, false_neg)
     """
 
-    assert y_true.size == y_pred.size
+    assert target.size == output.size
 
-    true_pos = np.sum(np.logical_and(y_true, y_pred))
-    true_neg = np.sum(np.logical_and(y_true == 0, y_pred == 0))
+    true_pos = np.sum(np.logical_and(target, output))
+    true_neg = np.sum(np.logical_and(target == 0, output == 0))
 
-    false_pos = np.sum(np.logical_and(y_true == 0, y_pred))
-    false_neg = np.sum(np.logical_and(y_true, y_pred == 0))
+    false_pos = np.sum(np.logical_and(target == 0, output))
+    false_neg = np.sum(np.logical_and(target, output == 0))
 
     return true_pos, true_neg, false_pos, false_neg
 
 
-def compute_lesion_confusion_matrix(y_true, y_pred):
-    # True positives
-    lesions_true, num_lesions_true = ndimage.label(y_true)
-    lesions_pred, num_lesions_pred = ndimage.label(y_pred)
-
-    true_pos = 0.0
-    for i in range(num_lesions_true):
-        lesion_detected = np.logical_and(y_pred, lesions_true == (i + 1)).any()
-        if lesion_detected: true_pos += 1
-    true_pos = np.min([true_pos, num_lesions_pred])
-
-    # False positives
-    tp_labels = np.unique(y_true * lesions_pred)
-    fp_labels = np.unique(np.logical_not(y_true) * lesions_pred)
-
-    # [label for label in fp_labels if label not in tp_labels]
-    false_pos = 0.0
-    for fp_label in fp_labels:
-        if fp_label not in tp_labels: false_pos += 1
-
-    return true_pos, false_pos, num_lesions_true, num_lesions_pred
-
-
-def compute_segmentation_metrics(y_true, y_pred, lesion_metrics=False, exclude=None):
-    metrics = {}
+def segmentation_metrics(output, target):
+    seg_metrics = {}
     eps = np.finfo(np.float32).eps
 
-    tp, tn, fp, fn = compute_confusion_matrix(y_true, y_pred)
-
+    # Compute confusion matrix parameters
+    tp, tn, fp, fn = compute_confusion_matrix(output, target)
     # Sensitivity and specificity
-    metrics['sens'] = tp / (tp + fn + eps) # Correct % of the real lesion
-    metrics['spec'] = tn / (tn + fp + eps) # Correct % of the healthy area identified
+    seg_metrics['sens'] = tp / (tp + fn + eps) # Correct % of the real lesion
+    seg_metrics['spec'] = tn / (tn + fp + eps) # Correct % of the healthy area identified
+    # Predictive values
+    seg_metrics['ppv'] = tp / (tp + fp + eps) # Of all lesion voxels, % of really lesion
+    seg_metrics['npv'] = tn / (tn + fn + eps)  # Of all lesion voxels, % of really healthy
 
-    # Predictive value
-    metrics['ppv'] = tp / (tp + fp + eps) # Of all lesion voxels, % of really lesion
-    metrics['npv'] = tn / (tn + fn + eps)  # Of all lesion voxels, % of really lesion
+    return seg_metrics
 
-    # Lesion metrics
-    if lesion_metrics:
-        tpl, fpl, num_lesions_true, num_lesions_pred = compute_lesion_confusion_matrix(y_true, y_pred)
-        metrics['l_tpf'] = tpl / num_lesions_true if num_lesions_true > 0 else np.nan
-        metrics['l_fpf'] = fpl / num_lesions_pred if num_lesions_pred > 0 else np.nan
+def haussdorf_distance(output, target):
+    """Haussdorf distance"""
+    try:
+        return haussdorf_dist(output, target, connectivity=3)
+    except Exception:
+        return np.nan
 
-        metrics['l_ppv'] = tpl / (tpl + fpl + eps)
-        metrics['l_f1'] = (2.0 * metrics['l_ppv'] * metrics['l_tpf']) / (metrics['l_ppv'] + metrics['l_tpf'] + eps)
-
-    # Dice coefficient
-    metrics['dsc'] = dice_coef(y_true, y_pred)
-
-    # Relative volume difference
-    metrics['avd'] = 2.0 * np.abs(np.sum(y_pred) - np.sum(y_true))/(np.sum(y_pred) + np.sum(y_true) + eps)
-
-    # Haussdorf distance
-    try: metrics['hd'] = haussdorf_dist(y_pred, y_true, connectivity=3)  # Why connectivity 3?
-    except Exception: metrics['hd'] = np.nan
-
-    if exclude is not None:
-        [metrics.pop(metric, None) for metric in exclude]
-
-    return metrics
-
-
-def dice_coef(y_true, y_pred, smooth = 0.01):
-    intersection = np.sum(np.logical_and(y_true, y_pred))
-
-    if intersection > 0:
-        return (2.0 * intersection + smooth) / (np.sum(y_true) + np.sum(y_pred) + smooth)
-    else:
+def dsc(output, target, smooth=0.01):
+    """Dice Similarity Coefficient"""
+    intersection = np.sum(np.logical_and(output, target))
+    if intersection < 1:
         return 0.0
+    return (2.0 * intersection + smooth) / (np.sum(output) + np.sum(target) + smooth)
 
-def compute_avg_std_metrics_list(metrics_list):
-    metrics_avg_std = dict()
+def mse(output, target):
+    """Mean squared error"""
+    return np.mean(np.power(output - target, 2))
 
-    assert len(metrics_list) > 0
+def mae(output, target, mask_zeros=False):
+    """Mean Absolute Error"""
+    output = output.flatten()
+    target = target.flatten()
 
-    for metric_name in metrics_list[0].keys():
-        metric_values = [metrics[metric_name] for metrics in metrics_list]
+    if mask_zeros:
+        nonzero_idxs = np.nonzero(target)
 
-        metrics_avg_std.update({
-            '{}_avg'.format(metric_name): np.nanmean(metric_values),
-            '{}_std'.format(metric_name): np.nanstd(metric_values)})
+        output = output[nonzero_idxs]
+        target = target[nonzero_idxs]
 
-    return  metrics_avg_std
+    return np.mean(np.abs(output - target))
 
+def ssim(output, target):
+    """Structural Similarity Index"""
+    A = np.abs(output / output.max()).astype(float)
+    B = np.abs(target / target.max()).astype(float)
+    intersect = np.multiply(A != 0, B != 0)
+    ua = A[intersect].mean()
+    ub = B[intersect].mean()
+    oa = A[intersect].std() ** 2
+    ob = B[intersect].std() ** 2
+    oab = np.sum(np.multiply(A[intersect] - ua, B[intersect] - ub)) / (np.sum(intersect) - 1)
+    k1 = 0.01
+    k2 = 0.03
+    L = 1
+    c1 = (k1 * L) ** 2
+    c2 = (k2 * L) ** 2
+    num = (2*ua*ub + c1) * (2*oab + c2)
+    den = (ua**2 + ub**2 + c1) * (oa + ob + c2)
+    return num / den
 
+def psnr(output, target, img_range=None):
+    """Peak signal to noise ratio"""
 
-def compute_clinical_metrics(y_true, y_pred):
-
-    vol_true, vol_pred = np.sum(y_true), np.sum(y_pred)
-
-    np.polyfit(x, y, deg)
-
-    pass
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    if img_range is None:
+        img_range  = np.max([target, output]) - np.min([target, output])
+    return 20.0 * np.log10(float(img_range)/mse(output, target))
 

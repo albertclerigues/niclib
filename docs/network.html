@@ -1,0 +1,359 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Network built-in functions &mdash; niclib2  documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script type="text/javascript" src="_static/jquery.js"></script>
+        <script type="text/javascript" src="_static/underscore.js"></script>
+        <script type="text/javascript" src="_static/doctools.js"></script>
+        <script type="text/javascript" src="_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="index.html" class="icon icon-home"> niclib2
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Table of Contents</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="builtins.html">Built-in functions</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Networks</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#module-niclib2.net.train">Network training</a></li>
+</ul>
+</li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">niclib2</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+      <li>Network built-in functions</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/network.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="module-niclib2.net">
+<span id="network-built-in-functions"></span><h1>Network built-in functions<a class="headerlink" href="#module-niclib2.net" title="Permalink to this headline">¶</a></h1>
+<dl class="function">
+<dt id="niclib2.net.save_model">
+<code class="descclassname">niclib2.net.</code><code class="descname">save_model</code><span class="sig-paren">(</span><em>filepath</em>, <em>model</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/niclib2/net.html#save_model"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#niclib2.net.save_model" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="niclib2.net.load_model">
+<code class="descclassname">niclib2.net.</code><code class="descname">load_model</code><span class="sig-paren">(</span><em>filepath</em>, <em>base_model=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/niclib2/net.html#load_model"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#niclib2.net.load_model" title="Permalink to this definition">¶</a></dt>
+<dd><p>Load a saved torch.nn.Module instance. # TODO finish
+:param filepath:
+:param base_model:
+:return:</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="niclib2.net.save_checkpoint">
+<code class="descclassname">niclib2.net.</code><code class="descname">save_checkpoint</code><span class="sig-paren">(</span><em>filepath</em>, <em>epoch</em>, <em>model</em>, <em>optimizer</em>, <em>loss</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/niclib2/net.html#save_checkpoint"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#niclib2.net.save_checkpoint" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="niclib2.net.load_checkpoint">
+<code class="descclassname">niclib2.net.</code><code class="descname">load_checkpoint</code><span class="sig-paren">(</span><em>filepath</em>, <em>model=None</em>, <em>optimizer=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/niclib2/net.html#load_checkpoint"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#niclib2.net.load_checkpoint" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="niclib2.net.compute_gradient_norm">
+<code class="descclassname">niclib2.net.</code><code class="descname">compute_gradient_norm</code><span class="sig-paren">(</span><em>model</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/niclib2/net.html#compute_gradient_norm"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#niclib2.net.compute_gradient_norm" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<div class="section" id="module-niclib2.net.train">
+<span id="network-training"></span><h2>Network training<a class="headerlink" href="#module-niclib2.net.train" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="niclib2.net.train.Trainer">
+<em class="property">class </em><code class="descclassname">niclib2.net.train.</code><code class="descname">Trainer</code><span class="sig-paren">(</span><em>max_epochs</em>, <em>loss_func</em>, <em>optimizer</em>, <em>optimizer_opts=None</em>, <em>train_metrics=None</em>, <em>val_metrics=None</em>, <em>plugins=None</em>, <em>device='cuda'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/niclib2/net/train.html#Trainer"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#niclib2.net.train.Trainer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Class for torch Module training using a training and validation set with basic metric supprt.
+It also has support for plugins, a way to embed functionality in the training procedure.</p>
+<p>Plugins are made by inheriting from the base class <a class="reference internal" href="#niclib2.net.train.TrainerPlugin" title="niclib2.net.train.TrainerPlugin"><code class="xref py py-class docutils literal notranslate"><span class="pre">TrainerPlugin</span></code></a> and overriding
+the inherited functions to implement the desired functionality.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>max_epochs</strong> (<em>int</em>) – maximum number of epochs to train. Training can be interrupted by setting the attribute <cite>keep_training</cite> to False.</p></li>
+<li><p><strong>loss_func</strong> (<em>torch.nn.Module</em>) – loss function.</p></li>
+<li><p><strong>optimizer</strong> – torch.optim.Optimizer derived optimizer.</p></li>
+<li><p><strong>train_metrics</strong> (<em>dict</em>) – dictionary with the desired metrics as key value pairs specifiying the metric name and the function object (callable) respectively. The loss function is automatically included under the key ‘loss’.</p></li>
+<li><p><strong>val_metrics</strong> (<em>dict</em>) – same as <cite>train_metrics</cite>.</p></li>
+<li><p><strong>plugins</strong> (<em>list</em>) – List of plugin objects.</p></li>
+<li><p><strong>device</strong> (<em>torch.device</em>) – torch device i.e. ‘cpu’, ‘cuda’, ‘cuda:0’…</p></li>
+</ul>
+</dd>
+</dl>
+<p>Runtime variables accesible to the plugins via the input argument <cite>trainer</cite>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Variables</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>keep_training</strong> (<em>bool</em>) – control flag to continue or interrupt the training. Checked at the start of each epoch.</p></li>
+<li><p><strong>model</strong> (<em>torch.nn.Module</em>) – the partially trained model.</p></li>
+<li><p><strong>model_optimizer</strong> (<em>torch.optim.Optimizer</em>) – the model optimizer.</p></li>
+<li><p><strong>train_gen</strong> (<em>torch.utils.data.DataLoader</em>) – </p></li>
+<li><p><strong>val_gen</strong> (<em>torch.utils.data.DataLoader</em>) – </p></li>
+<li><p><strong>train_metrics</strong> (<em>dict</em>) – </p></li>
+<li><p><strong>val_metrics</strong> (<em>dict</em>) – </p></li>
+<li><p><strong>images</strong> (<em>torch.Tensor</em>) – </p></li>
+<li><p><strong>y</strong> (<em>torch.Tensor</em>) – </p></li>
+<li><p><strong>y_pred</strong> (<em>torch.Tensor</em>) – </p></li>
+<li><p><strong>loss</strong> (<em>torch.Tensor</em>) – </p></li>
+</ul>
+</dd>
+</dl>
+<dl class="method">
+<dt id="niclib2.net.train.Trainer.train">
+<code class="descname">train</code><span class="sig-paren">(</span><em>model</em>, <em>train_gen</em>, <em>val_gen</em>, <em>checkpoint=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/niclib2/net/train.html#Trainer.train"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#niclib2.net.train.Trainer.train" title="Permalink to this definition">¶</a></dt>
+<dd><p>Trains a given model using the provided <code class="xref py py-class docutils literal notranslate"><span class="pre">torch.data.DataLoader</span></code> generators.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> (<em>torch.nn.Module</em>) – the model to train.</p></li>
+<li><p><strong>train_gen</strong> (<em>torch.utils.data.DataLoader</em>) – An iterator returning (images, y) pairs for training.</p></li>
+<li><p><strong>val_gen</strong> (<em>torch.utils.data.DataLoader</em>) – An iterator returning (images, y) pairs for validation.</p></li>
+<li><p><strong>checkpoint</strong> (<em>dict</em>) – (optional) checkpoint that can include ‘epoch’, ‘model’, ‘optimizer’ or ‘loss’</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return torch.nn.Module</dt>
+<dd class="field-even"><p>the trained model.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="niclib2.net.train.TrainerPlugin">
+<em class="property">class </em><code class="descclassname">niclib2.net.train.</code><code class="descname">TrainerPlugin</code><a class="reference internal" href="_modules/niclib2/net/train.html#TrainerPlugin"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#niclib2.net.train.TrainerPlugin" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">abc.ABC</span></code></p>
+<p>Abstract Base Class for subclassing training plugins. Subclasses can override the following callbacks:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">on_init(self,</span> <span class="pre">trainer)</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">on_train_start(self,</span> <span class="pre">trainer)</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">on_train_end(self,</span> <span class="pre">trainer)</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">on_train_epoch_start(self,</span> <span class="pre">trainer,</span> <span class="pre">num_epoch)</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">on_train_epoch_end(self,</span> <span class="pre">trainer,</span> <span class="pre">num_epoch)</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">on_val_epoch_start(self,</span> <span class="pre">trainer,</span> <span class="pre">num_epoch)</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">on_val_epoch_end(self,</span> <span class="pre">trainer,</span> <span class="pre">num_epoch)</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">on_train_batch_start(self,</span> <span class="pre">trainer,</span> <span class="pre">batch_idx)</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">on_train_batch_end(self,</span> <span class="pre">trainer,</span> <span class="pre">batch_idx)</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">on_val_batch_start(self,</span> <span class="pre">trainer,</span> <span class="pre">batch_idx)</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">on_val_batch_end(self,</span> <span class="pre">trainer,</span> <span class="pre">batch_idx)</span></code></p></li>
+</ul>
+<p>where:</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>trainer</strong> – <a class="reference internal" href="#niclib2.net.train.Trainer" title="niclib2.net.train.Trainer"><code class="xref py py-class docutils literal notranslate"><span class="pre">Trainer</span></code></a> instance that grants access to all its runtime attributes i.e. <code class="docutils literal notranslate"><span class="pre">trainer.model</span></code>, <code class="docutils literal notranslate"><span class="pre">trainer.train_gen</span></code>…</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="class">
+<dt id="niclib2.net.train.ModelCheckpoint">
+<em class="property">class </em><code class="descclassname">niclib2.net.train.</code><code class="descname">ModelCheckpoint</code><span class="sig-paren">(</span><em>filepath</em>, <em>save='best'</em>, <em>metric_name='loss'</em>, <em>mode='min'</em>, <em>min_delta=0.0001</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/niclib2/net/train.html#ModelCheckpoint"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#niclib2.net.train.ModelCheckpoint" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#niclib2.net.train.TrainerPlugin" title="niclib2.net.train.TrainerPlugin"><code class="xref py py-class docutils literal notranslate"><span class="pre">niclib2.net.train.TrainerPlugin</span></code></a></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>filepath</strong> – filepath for checkpoint storage</p></li>
+<li><p><strong>save</strong> (<em>str</em>) – save mode, either <code class="docutils literal notranslate"><span class="pre">best</span></code>, <code class="docutils literal notranslate"><span class="pre">all</span></code> or <code class="docutils literal notranslate"><span class="pre">last</span></code>.</p></li>
+<li><p><strong>metric_name</strong> – only for <code class="docutils literal notranslate"><span class="pre">save='best'</span></code> name of the monitored metric for</p></li>
+<li><p><strong>mode</strong> (<em>str</em>) – either <code class="docutils literal notranslate"><span class="pre">min</span></code> or <code class="docutils literal notranslate"><span class="pre">max</span></code></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="class">
+<dt id="niclib2.net.train.EarlyStopping">
+<em class="property">class </em><code class="descclassname">niclib2.net.train.</code><code class="descname">EarlyStopping</code><span class="sig-paren">(</span><em>metric_name</em>, <em>patience</em>, <em>min_delta=0.0001</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/niclib2/net/train.html#EarlyStopping"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#niclib2.net.train.EarlyStopping" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#niclib2.net.train.TrainerPlugin" title="niclib2.net.train.TrainerPlugin"><code class="xref py py-class docutils literal notranslate"><span class="pre">niclib2.net.train.TrainerPlugin</span></code></a></p>
+<p>Plugin to interrupt the training with the early stopping technique.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>filepath</strong> – Filepath where the best model will be stored.</p></li>
+<li><p><strong>metric_name</strong> (<em>str</em>) – monitored metric name. The name has to exist as a key in the val_metrics provided to the <a class="reference internal" href="#niclib2.net.train.Trainer" title="niclib2.net.train.Trainer"><code class="xref py py-class docutils literal notranslate"><span class="pre">Trainer</span></code></a>.</p></li>
+<li><p><strong>patience</strong> (<em>int</em>) – Number of epochs to wait since the last best model before interrupting training.</p></li>
+<li><p><strong>min_delta</strong> – minimum change between metric values to consider a new best model.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="class">
+<dt id="niclib2.net.train.ProgressBar">
+<em class="property">class </em><code class="descclassname">niclib2.net.train.</code><code class="descname">ProgressBar</code><span class="sig-paren">(</span><em>print_interval=0.4</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/niclib2/net/train.html#ProgressBar"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#niclib2.net.train.ProgressBar" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#niclib2.net.train.TrainerPlugin" title="niclib2.net.train.TrainerPlugin"><code class="xref py py-class docutils literal notranslate"><span class="pre">niclib2.net.train.TrainerPlugin</span></code></a></p>
+<p>Plugin to print a progress bar and metrics during the training procedure.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>print_interval</strong> (<em>float</em>) – time in seconds between print updates.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2019, Vicorob
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

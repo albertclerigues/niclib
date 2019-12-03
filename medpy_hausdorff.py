@@ -130,7 +130,7 @@ def precision(result, reference):
     Returns
     -------
     precision : float
-        The precision between two binary datasets, here mostly binary objects in images,
+        The precision between two binary sets, here mostly binary objects in images,
         which is defined as the fraction of retrieved instances that are relevant. The
         precision is not symmetric.
     
@@ -177,7 +177,7 @@ def recall(result, reference):
     Returns
     -------
     recall : float
-        The recall between two binary datasets, here mostly binary objects in images,
+        The recall between two binary sets, here mostly binary objects in images,
         which is defined as the fraction of relevant instances that are retrieved. The
         recall is not symmetric.
     
@@ -235,7 +235,7 @@ def specificity(result, reference):
     Returns
     -------
     specificity : float
-        The specificity between two binary datasets, here mostly binary objects in images,
+        The specificity between two binary sets, here mostly binary objects in images,
         which denotes the fraction of correctly returned negatives. The
         specificity is not symmetric.
     
