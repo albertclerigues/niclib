@@ -1,13 +1,15 @@
-import numpy as np
-import nibabel as nib
-import math
-import SimpleITK as sitk
 import warnings
 
+import SimpleITK as sitk
+import nibabel as nib
+import numpy as np
 from skimage import measure
+
 
 def reorient_nifti(nifti, reference=None):
     """
+    TODO check
+
     Reorients axis and orientation of `nifti` to match `reference`.
     If no reference is provided then it is reoriented to canonical orientation (RAS).
 
@@ -23,13 +25,13 @@ def reorient_nifti(nifti, reference=None):
         return nifti.as_reoriented(nib.io_orientation(reference.affine))
 
 
-
 def normalize_by_range(img, new_range, old_range=None):
     """
     Scales the intensity range of the given array to the new range.
     :param img: the input array
     :param list new_range: two element list with the minimum and maximum values of the output
-    :param list old_range: two element list with the minimum and maximum values of the input. If not given then the range is computed from the minimum and maximum value of the input.
+    :param list old_range: two element list with the minimum and maximum values of the input.
+    If not given then the range is computed from the minimum and maximum value of the input.
     :return:
     """
     new_low, new_high = float(new_range[0]), float(new_range[1])

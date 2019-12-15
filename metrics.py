@@ -1,5 +1,9 @@
 import numpy as np
-from niclib2.medpy_hausdorff import hd as haussdorf_dist
+
+from .medpy_hausdorff import hd as haussdorf_dist
+
+
+# TODO use torch versions to also use GPU if available
 
 def compute_metrics(outputs, targets, metrics, ids=None):
     """
@@ -26,10 +30,8 @@ def compute_metrics(outputs, targets, metrics, ids=None):
     return all_metrics
 
 def compute_confusion_matrix(output, target):
-    """
-    Returns tuple (true_pos, true_neg, false_pos, false_neg)
-    """
-
+    """Returns tuple (true_pos, true_neg, false_pos, false_neg)"""
+    assert output.size(1) == target.size(1) == 2
     assert target.size == output.size
 
     true_pos = np.sum(np.logical_and(target, output))
@@ -56,35 +58,51 @@ def segmentation_metrics(output, target):
 
     return seg_metrics
 
-def haussdorf_distance(output, target):
+def haussdorf_distance(output: np.ndarray, target: np.ndarray):
     """Haussdorf distance"""
     try:
         return haussdorf_dist(output, target, connectivity=3)
     except Exception:
         return np.nan
 
-def dsc(output, target, smooth=0.01):
-    """Dice Similarity Coefficient"""
-    intersection = np.sum(np.logical_and(output, target))
-    if intersection < 1:
-        return 0.0
-    return (2.0 * intersection + smooth) / (np.sum(output) + np.sum(target) + smooth)
+def dsc(output, target, background_label=0):
+    """Dice Similarity Coefficient
+
+    :param output: class labels of segmentation
+    :param target: class labels of ground truth
+    :param background_label:
+
+    :Example:
+
+    >>> dsc([0, 1, 1], [1, 1, 0])
+    0.5
+    >>> dsc([0, 1, 2, 2], [0, 1, 2, 3])
+    0.6666666666666666
+    """
+    output, target = np.asanyarray(output), np.asanyarray(target)
+    assert np.array_equal(output.shape, target.shape)
+    output_mask, target_mask = output != background_label, target != background_label # Background/Foreground masking
+    intersection = np.sum(np.logical_and(np.equal(output, target), np.logical_or(output_mask, target_mask)))
+    denominator = np.sum(output_mask) + np.sum(target_mask)
+    return 2.0 * intersection / denominator if denominator > 0 else 0
 
 def mse(output, target):
     """Mean squared error"""
     return np.mean(np.power(output - target, 2))
 
 def mae(output, target, mask_zeros=False):
-    """Mean Absolute Error"""
-    output = output.flatten()
-    target = target.flatten()
+    """Mean Absolute Error
+    :Example:
 
+    >>> mae([0.0, 0.0], [1.0, 1.0])
+    """
+    output, target = np.asanyarray(output), np.asanyarray(target)
+    assert np.array_equal(output.shape, target.shape)
+
+    output, target = output.flatten(), target.flatten()
     if mask_zeros:
         nonzero_idxs = np.nonzero(target)
-
-        output = output[nonzero_idxs]
-        target = target[nonzero_idxs]
-
+        output, target = output[nonzero_idxs], target[nonzero_idxs]
     return np.mean(np.abs(output - target))
 
 def ssim(output, target):

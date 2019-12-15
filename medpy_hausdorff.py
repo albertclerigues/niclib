@@ -23,10 +23,11 @@
 # third-party modules
 import numpy
 from scipy.ndimage import _ni_support
-from scipy.ndimage.morphology import distance_transform_edt, binary_erosion,\
-    generate_binary_structure
 from scipy.ndimage.measurements import label, find_objects
+from scipy.ndimage.morphology import distance_transform_edt, binary_erosion, \
+    generate_binary_structure
 from scipy.stats import pearsonr
+
 
 # own modules
 

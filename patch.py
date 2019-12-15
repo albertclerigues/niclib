@@ -1,17 +1,17 @@
 import copy
-import sys
-import torch
-import numpy as np
-from torch.utils.data import Dataset as TorchDataset
-from torch.utils.data.dataloader import DataLoader
 import itertools
+import warnings
 
-from niclib2 import clamp_list
-from niclib2 import printProgressBar
-from niclib2.data import compute_normalization_statistics
+import numpy as np
+import torch
+from torch.utils.data import Dataset as TorchDataset
 
-def build_generator(dataset, batch_size, shuffle):
-    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=4)
+from .__init__ import resample_list, print_progress_bar
+from .data import compute_normalization_statistics
+
+warnings.warn('niclib.patch will move to niclib.generators.patch in next version', DeprecationWarning)
+
+
 
 class PatchSet(TorchDataset):
     def __init__(self, images, centers, patch_shape, normalize, dtype=np.float32):
@@ -221,14 +221,16 @@ def denormalize_patch(patch, mean, std):
     return patch
 
 class PatchVolumePredictor:
-    def __init__(self, in_shape, extraction_step, normalize, num_ch_out, out_shape=None,  skip_fn=None):
+    def __init__(self, in_shape, extraction_step, normalize, num_ch_out, out_shape=None,  activation=None, batch_size=32):
         self.in_shape = in_shape
         self.out_shape = in_shape if out_shape is None else out_shape
         self.extraction_step = extraction_step
         self.do_normalize = normalize
         self.num_ch_out = num_ch_out
 
-        self.skip_fn = skip_fn
+        self.bs = batch_size
+
+        self.activation = activation
 
         #torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
@@ -237,7 +239,7 @@ class PatchVolumePredictor:
         x_centers = sample_centers_uniform(x.shape[1:], self.in_shape, self.extraction_step)
 
         patch_gen = build_generator(
-            PatchSet([x], [x_centers], self.in_shape, self.do_normalize), batch_size=1, shuffle=False)
+            PatchSet([x], [x_centers], self.in_shape, self.do_normalize), batch_size=self.bs, shuffle=False)
 
         # Prepare inference variables
         x_slices = get_patch_slices(x_centers, self.in_shape)
@@ -250,16 +252,21 @@ class PatchVolumePredictor:
         model.eval()
         model.to(device)
         with torch.no_grad():
-            for n, (x_patch, x_slice) in enumerate(zip(patch_gen, x_slices)):
+            for n, x_patch in enumerate(patch_gen):
                 x_patch = x_patch.to(device)
 
                 y_pred = model(x_patch)
-                y_pred = y_pred[0, 0:self.num_ch_out]
+                if self.activation is not None:
+                    y_pred = self.activation(y_pred)
 
-                voting_img[x_slice] += y_pred
-                counting_img[x_slice] += torch.ones_like(y_pred)
+                y_pred = y_pred[:, 0:self.num_ch_out]
 
-                printProgressBar(n, len(patch_gen), suffix=" patches predicted")
+                batch_slices = x_slices[self.bs*n:self.bs*(n+1)]
+                for predicted_patch, x_slice in zip(y_pred, batch_slices):
+                    voting_img[x_slice] += predicted_patch
+                    counting_img[x_slice] += torch.ones_like(predicted_patch)
+
+                print_progress_bar(n, len(patch_gen), suffix=" patches predicted")
 
         voting_img = voting_img.cpu().numpy()
         counting_img = counting_img.cpu().numpy()
@@ -288,8 +295,7 @@ def sample_centers_balanced(vol, labels, patch_shape, num_centers):
     ### Resample (repeating or removing) to appropiate number
     centers_per_label = num_centers / len(label_ids)
     for id_label in labels_centers.keys():
-        labels_centers[id_label] = np.asarray(clamp_list(
-            labels_centers[id_label], min_len=centers_per_label, max_len=centers_per_label))
+        labels_centers[id_label] = np.asarray(resample_list(labels_centers[id_label], centers_per_label))
 
     ### Add random offset that doesn't go outside bounds
     for id_label, centers_label in labels_centers.items():

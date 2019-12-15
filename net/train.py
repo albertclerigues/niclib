@@ -1,30 +1,21 @@
 import copy
 import os
-
-import torch
-from abc import ABC, abstractmethod
-import numpy as np
-
 import sys
 import threading
 import time
+from abc import ABC
 
-import torch.nn.functional as F
-
-import cv2
-from niclib2.data import normalize_by_range
-import niclib2
-
-from niclib2 import moving_average
-from niclib2.net import compute_gradient_norm
-
+import torch
 from torch import nn
+
+from ..__init__ import RemainingTimeEstimator
+
 
 class Trainer:
     """Class for torch Module training using a training and validation set with basic metric supprt.
     It also has support for plugins, a way to embed functionality in the training procedure.
 
-    Plugins are made by inheriting from the base class :py:class:`~niclib2.net.train.TrainerPlugin` and overriding
+    Plugins are made by inheriting from the base class :py:class:`~niclib.net.train.TrainerPlugin` and overriding
     the inherited functions to implement the desired functionality.
 
     :param int max_epochs: maximum number of epochs to train. Training can be interrupted by setting the attribute `keep_training` to False.
@@ -33,7 +24,7 @@ class Trainer:
     :param dict train_metrics: dictionary with the desired metrics as key value pairs specifiying the metric name and the function object (callable) respectively. The loss function is automatically included under the key 'loss'.
     :param dict val_metrics: same as `train_metrics`.
     :param list plugins: List of plugin objects.
-    :param torch.device device: torch device i.e. 'cpu', 'cuda', 'cuda:0'...
+    :param torch.device device: torch torch_device i.e. 'cpu', 'cuda', 'cuda:0'...
 
     Runtime variables accesible to the plugins via the input argument `trainer`.
 
@@ -166,8 +157,10 @@ class Trainer:
             self.loss.backward()  # Compute autograd weight gradients from loss
             self.model_optimizer.step()  # Update the weights according to gradients
 
-            for k, eval_func in self.train_metric_funcs.items(): # Update training metrics
-                self.train_metrics['train_{}'.format(k)] += eval_func(self.y_pred, self.y).item()
+            # TODO test!
+            with torch.no_grad():
+                for k, eval_func in self.train_metric_funcs.items(): # Update training metrics
+                    self.train_metrics['train_{}'.format(k)] += eval_func(self.y_pred, self.y).item()
 
             [plugin.on_train_batch_end(self, batch_idx) for plugin in self.plugins]
 
@@ -235,7 +228,7 @@ class TrainerPlugin(ABC):
 
     where:
 
-    :param trainer: :py:class:`Trainer <niclib2.net.train.Trainer>` instance that grants access to all its runtime attributes i.e. ``trainer.model``, ``trainer.train_gen``...
+    :param trainer: :py:class:`Trainer <niclib.net.train.Trainer>` instance that grants access to all its runtime attributes i.e. ``trainer.model``, ``trainer.train_gen``...
 
     """
     def on_init(self, trainer):
@@ -365,7 +358,7 @@ class ProgressBar(TrainerPlugin):
     def on_train_epoch_start(self, trainer, num_epoch):
         print("\nEpoch {}/{}".format(num_epoch, trainer.max_epochs))
 
-        self.eta = ElapsedTimeEstimator(len(trainer.train_gen))
+        self.eta = RemainingTimeEstimator(len(trainer.train_gen))
         self.print_flag = True
         self.print_timer = None
 
@@ -386,7 +379,7 @@ class ProgressBar(TrainerPlugin):
 
     def on_train_epoch_end(self, trainer, num_epoch):
         self.print_timer.cancel()
-        self._printProgressBar(len(trainer.train_gen), len(trainer.train_gen), self.eta.get_elapsed_time(), trainer.train_metrics)
+        self._printProgressBar(len(trainer.train_gen), len(trainer.train_gen), self.eta.elapsed_time(), trainer.train_metrics)
 
     def on_val_epoch_end(self, trainer, num_epoch):
         for k, v in trainer.val_metrics.items():
@@ -409,48 +402,6 @@ class ProgressBar(TrainerPlugin):
         print('\r [{}] {}/{} ({}%) ETA {} - {}'.format(
             bar, batch_num, total_batches, percent, eta, metrics_string), end='')
         sys.stdout.flush()
-
-
-
-
-class ElapsedTimeEstimator:
-    def __init__(self, total_iters, update_weight=0.05):
-        self.total_eta = None
-        self.start_time = time.time()
-        self.total_iters = total_iters
-
-        self.last_iter = {'num': 0, 'time': time.time()}
-        self.update_weight = update_weight
-
-    def update(self, current_iter_num):
-        current_eta, current_iter = None, {'num': current_iter_num, 'time':time.time()}
-        if current_iter['num'] > self.last_iter['num']:
-            iters_between = current_iter['num'] - self.last_iter['num']
-            time_between = current_iter['time'] - self.last_iter['time']
-            current_eta = (time_between / iters_between) * (self.total_iters - current_iter['num'])
-            if self.total_eta is None or current_iter_num < 10:
-                self.total_eta = current_eta
-
-            w = self.update_weight
-            self.total_eta = (current_eta * w) + ((self.total_eta - time_between) * (1 - w))
-
-        self.last_iter = current_iter
-        # Return formatted eta in hours, minutes, seconds
-        return self._format_time_interval(self.total_eta) if current_eta is not None else '?'
-
-    def get_elapsed_time(self):
-        return self._format_time_interval(time.time() - self.start_time)
-
-    @staticmethod
-    def _format_time_interval(seconds):
-        time_format = "%M:%S"
-        if seconds > 3600:
-            time_format = "%H:%M:%S"
-            if seconds > 24 * 3600:
-                time_format = "%d days, %H:%M:%S"
-
-        formatted_time = time.strftime(time_format, time.gmtime(seconds))
-        return formatted_time
 
 
 

@@ -1,8 +1,0 @@
-Dataset management
-==================
-
-A dataset is made by a list of cases. A case is represented by a dictionary that with key-value pairs holding the required information.
-
-.. automodule:: niclib2.dataset
-   :members:
-   :undoc-members:

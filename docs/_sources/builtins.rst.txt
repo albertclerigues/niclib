@@ -1,6 +1,0 @@
-Built-in functions
-==================
-
-.. automodule:: niclib2
-   :members:
-   :undoc-members:
