@@ -237,7 +237,7 @@ def isnan(x):
 
 def mean(l, ignore_nan=False, empty=0):
     """
-    nanmean compatible with generators.
+    nanmean compatible with generator.
     """
     l = iter(l)
     if ignore_nan:

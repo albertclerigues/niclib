@@ -9,15 +9,45 @@ from .lovasz_losses import lovasz_softmax_flat
 
 #########################################################################
 ### Loss Wrappers
-class Hard2SoftLoss(nn.Module):
-    """Torch loss wrapper that allows the use of probabilistic targets in segmentation losses that use targets with hard integer label_img.
+class LossWrapper(nn.Module):
+    """LossWrapper creates a nn.Module object that allows to preprocessing of the tensors and/or postprocess the loss output.
 
-    :param loss_function: the function MUST accept keyword argument ``reduction='none'`` as in ``loss_function(output, target, reduction='none')``. If input tensors are of size (BS, CH, *) the shape returned with ``reduction='none'`` must be (BS, *)
+    :param callable loss_fn: The loss function with input arguments (output, target)
+    :param callable preprocess_fn: Preprocess function with signature ``preprocess_fn(output, target)`` that returns
+        a tuple ``(output_preprocessed, target_preprocessed)``.
+    :param callable postprocess_fn: Postprocess function with signature ``postprocess_fn(loss_output)`` that returns
+        a single tensor ``loss_output_postprocessed``.
+
+    :Example:
+
+    >>> # Crossentropy loss needs a tensor of type long as target, but ours is of type float!
+    >>> my_loss = LossWrapper(nn.CrossEntropyLoss(), preprocess_fn=lambda output, target: (output, target.long()))
+    """
+    def __init__(self, loss_fn, preprocess_fn=None, postprocess_fn=None):
+        super().__init__()
+        self.loss_fn, self.pre_fn, self.post_fn = loss_fn, preprocess_fn, postprocess_fn
+
+    def forward(self, output, target):
+        if self.pre_fn is not None:
+            output, target = self.pre_fn(output, target)
+        loss_output = self.loss_fn(output, target)
+        if self.post_fn is not None:
+            loss_output = self.post_fn(loss_output)
+        return loss_output
+
+
+class Hard2SoftLoss(nn.Module):
+    """Torch loss wrapper that allows the use of probabilistic targets in segmentation losses that use targets
+        with hard integer labels.
+
+    :param loss_function: the function MUST accept keyword argument ``reduction='none'`` as in
+        ``loss_function(output, target, reduction='none')``. If input tensors are of size (BS, CH, *)
+        the shape returned with ``reduction='none'`` must be (BS, *)
     :param weights: (optional) iterable of length equal to the number of channels (dim=1)
-    :param reduction: one of ``mean``, ``sum`` or ``none`` (default: 'mean')
+    :param str reduction: one of ``mean``, ``sum`` or ``none`` (default: 'mean')
     """
 
-    def __init__(self, loss_function, weights=None, reduction : str ='mean'):
+    def __init__(self, loss_function, weights=None, reduction='mean'):
         super().__init__()
         self.loss_fn = loss_function
         self.weights = weights
@@ -47,18 +77,12 @@ class Hard2SoftLoss(nn.Module):
             raise ValueError("Keyword 'reduction' must be one of ['none', 'mean', 'sum']")
 
 
-class LossWrapper(nn.Module):
-    def __init__(self, loss_function, preprocess_function=None, postprocess_function=None):
-        super().__init__()
-        self.loss_fn, self.pre_fn, self.post_fn = loss_function, preprocess_function, postprocess_function
 
-    def forward(self, output, target):
-        if self.pre_fn is not None:
-            output, target = self.pre_fn(output, target)
-        loss_output = self.loss_fn(output, target)
-        if self.post_fn is not None:
-            loss_output = self.post_fn(loss_output)
-        return loss_output
+def soft_crossentropy_with_logits(output, target):
+    num_ch = output.size(1)
+    out_flat = output.transpose(0, 1).contiguous().view(num_ch, -1).transpose(0, 1)
+    tgt_flat = target.transpose(0, 1).contiguous().view(num_ch, -1).transpose(0, 1)
+    return cross_entropy_with_probs(out_flat, tgt_flat)
 
 
 class LovaszSoftmaxLoss(nn.Module):
@@ -130,8 +154,3 @@ class BinaryFocalLoss(nn.Module):
         return torch.mean(-1.0 * (fl_0 + fl_1))
 
 
-def soft_crossentropy_with_logits(output, target):
-    num_ch = output.size(1)
-    out_flat = output.transpose(0, 1).contiguous().view(num_ch, -1).transpose(0, 1)
-    tgt_flat = target.transpose(0, 1).contiguous().view(num_ch, -1).transpose(0, 1)
-    return cross_entropy_with_probs(out_flat, tgt_flat)

@@ -11,13 +11,14 @@
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 
 import os
+import sphinx_rtd_theme
 import sys
 sys.path.insert(0, os.path.expanduser('~/mic_home/my_libraries/niclib'))
 
 
 # -- Project information -----------------------------------------------------
 project = 'niclib'
-copyright = '2019, Vicorob'
+copyright = '2019, VICOROB (University of Girona)'
 author = 'Albert Clèrigues'
 
 
@@ -28,7 +29,8 @@ author = 'Albert Clèrigues'
 # ones.
 extensions = [
 'sphinx.ext.autodoc',
-'sphinx.ext.viewcode'
+'sphinx.ext.viewcode',
+'sphinx_rtd_theme'
 ]
 autodoc_member_order = 'bysource'
 
@@ -39,9 +41,7 @@ templates_path = ['_templates']
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = []
-
 pygments_style='friendly'
-
 
 # -- Options for HTML output -------------------------------------------------
 
@@ -51,10 +51,16 @@ pygments_style='friendly'
 html_theme = 'sphinx_rtd_theme'
 html_theme_options = {
 #    "relbarbgcolor": "black",
-    "body_max_width": 1200,
     'navigation_depth': 4
 }
+
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
+
+# These paths are either relative to html_static_path
+# or fully qualified paths (eg. https://...)
+html_css_files = [
+    'css/custom.css',
+]

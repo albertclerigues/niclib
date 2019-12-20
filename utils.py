@@ -14,20 +14,6 @@ import numpy as np
 import torch
 from art import tprint
 
-
-# #######################################################################################################################
-# ## niclib imports # from . import net, generators, data, metrics
-# from . import net, generators, data, metrics
-#
-# #######################################################################################################################
-# ## Reproducibility and determinism
-# torch.manual_seed(0)
-# np.random.seed(0)
-# torch.backends.cudnn.deterministic = True
-# torch.backends.cudnn.benchmark = False
-#
-# device='cuda'
-
 #######################################################################################################################
 ## Path utils
 def make_dir(dir_path):
@@ -76,6 +62,8 @@ def get_base_path(filepath):
 
     >>> get_base_path('/home/user/t1_image.nii.gz')
     '/home/user'
+    >>> get_base_path('/home/user/t1_image.nii.gz') + 'transform.mat'
+    '/home/user/transform.mat'
     """
     return os.path.dirname(filepath)
 
@@ -87,6 +75,8 @@ def remove_extension(filepath):
 
     >>> remove_extension('home/user/t1_image.nii.gz')
     'home/user/t1_image'
+    >>> remove_extension('home/user/t1_image.nii.gz') + '_processed.nii.gz'
+    'home/user/t1_image_processed.nii.gz'
     """
     paths = filepath.split('/')
     if '.' not in paths[-1]:  # No extension found in filepath
@@ -103,7 +93,7 @@ def parallel_load(load_func, arguments, num_workers):
     """Loads a dataset using parallel threads for faster load times (especially of .nii.gz files).
 
     :param callable load_func: function that loads and returns one dataset element. It can return any type and have any number of positional arguments.
-    :param List[Any] arguments: list containing the load_func arguments for each dataset element to load. If load_func has more than one argument, the arguments must be provided as a list. The function is called as ``load_func(*arguments[i])`` to load the i :sup:`th` element.
+    :param arguments: (List[Any] or List[List[Any]]) list containing the load_func arguments for each dataset element to load. If load_func has more than one argument, the arguments must be provided as a list. The function is called as ``load_func(*arguments[i])`` to load the i :sup:`th` element.
     :param int num_workers: number of parallel workers to use.
     :return: A list with the loaded dataset elements
 
@@ -118,15 +108,16 @@ def parallel_load(load_func, arguments, num_workers):
     (182, 218, 182)
     """
     assert callable(load_func), 'load_func must be a function handler'
-
     # Adjust for variadic positional arguments (i.e. the * in fn(*args)) that need a list of arguments to work
     if all([not isinstance(arg, list) for arg in arguments]):
         arguments = [[arg] for arg in arguments]
 
+    # Define output variable and load function wrapper to maintain correct list order
     dataset = [None] * len(arguments)
     def _run_load_func(n_, args_):
         dataset[n_] = load_func(*args_)
 
+    # Parallel load the dataset
     pool = ThreadPoolExecutor(max_workers=num_workers)
     for n, args in enumerate(arguments):
         pool.submit(_run_load_func, n, args)
@@ -134,24 +125,35 @@ def parallel_load(load_func, arguments, num_workers):
     return dataset
 
 
-def save_nifti(filepath, image, reference=None, dtype=None):
-    """Saves the given array as a Nifti1Image.
+def save_nifti(filepath, volume, dtype=None, reference=None, channel_handling='none'):
+    """Saves the given volume array as a Nifti1Image using nibabel.
 
     :param str filepath: filename where the nifti will be saved
-    :param numpy.ndarray image: the volume to save in a nifti image
-    :param nibabel.Nifti1Image reference: (optional) reference nifti from where to take the affine transform and header
+    :param numpy.ndarray volume: the volume with shape (X, Y, Z) or (CH, X, Y, Z) to save in a nifti image
     :param dtype: (optional) data type for the stored image (default: same dtype as `image`)
+    :param nibabel.Nifti1Image reference: (optional) reference nifti from where to take the affine transform and header
+    :param str channel_handling: (default: ``'none'``) One of ``'none'``, ``'last'`` or ``'split'``.
+        If ``none``, the array is stored in the nifti as given. If  ``'last'`` the channel dimension is put last, this
+        is useful to visualize images as multi-component data in *ITK-SNAP*. If ``'split'``, then the image channels
+        are each stored in a different nifti file.
     """
-
-    # TODO add support for multichannel images
+    # Multichannel images
+    assert channel_handling in {'none', 'last', 'split'}
+    if len(volume.shape) == 4 and channel_handling != 'none':
+        if channel_handling == 'last':
+            volume = np.transpose(volume, axes=(1, 2, 3, 0))
+        elif channel_handling == 'split':
+            for n, channel in enumerate(volume):
+                savename = '{}_ch{}.nii.gz'.format(remove_extension(filepath), n)
+                save_nifti(savename, channel, dtype=dtype, reference=reference)
 
     if dtype is not None:
-        image = image.astype(dtype)
+        volume = volume.astype(dtype)
 
     if reference is None:
-        nifti = nib.Nifti1Image(image, np.eye(4))
+        nifti = nib.Nifti1Image(volume, np.eye(4))
     else:
-        nifti = nib.Nifti1Image(image, reference.affine, reference.header)
+        nifti = nib.Nifti1Image(volume, reference.affine, reference.header)
 
     print("Saving nifti: {}".format(filepath))
     nifti.to_filename(filepath)
@@ -161,7 +163,8 @@ def save_to_csv(filepath, dict_list):
     """Saves a list of dictionaries as a .csv file.
 
     :param str filepath: the output filepath
-    :param List[Dict] dict_list: The data to store as a list of dictionaries. Each dictionary will correspond to a row of the .csv file with a column for each key in the dictionaries.
+    :param List[Dict] dict_list: The data to store as a list of dictionaries.
+        Each dictionary will correspond to a row of the .csv file with a column for each key in the dictionaries.
 
     :Example:
 
@@ -178,6 +181,11 @@ def load_from_csv(filepath):
     """Loads a .csv file as a list of dictionaries
 
     :return: a list of dictionaries (one per row)
+
+    :Example:
+
+    >>> print(load_from_csv('data.csv')[0])
+    {'id': '0', 'score': 0.5}
     """
 
     with open(filepath, mode='r') as f:
@@ -424,34 +432,3 @@ def print_big(a):
     """
     tprint(a)
 
-
-#######################################################################################################################
-# Cemetery
-
-def printProgressBar(iteration, total, prefix='', suffix='', decimals=1, length=25, fill='='):
-    warnings.warn('Please use print_progress_bar', DeprecationWarning)
-    print_progress_bar(iteration, total, prefix, suffix, decimals, length, fill)
-
-
-def clamp_list(l, min_len=None, max_len=None):
-    """
-    Clamps a given list so that its length is between min_len and max_len elements.
-    To shorten a list elements are removed at regular intervals.
-    To lengthen a list elements are repeated to reach desired length.
-
-    :param l: the list
-    :param min_len: the minimum desired length
-    :param max_len: the maximum desired length
-    :return: the clamped list
-    """
-    warnings.warn('Please use resample_list', DeprecationWarning)
-
-    if min_len is not None and len(l) < min_len:  # under specified minimum
-        resampling_idxs = list(np.mod(range(min_len), len(l)).astype(int))  # Oversampling of images
-        return [l[i] for i in resampling_idxs]
-
-    if max_len is not None and len(l) > max_len:  # over specified maximum
-        resampling_idxs = np.arange(start=0.0, stop=float(len(l)) - 1.0, step=len(l) / float(max_len)).astype(int)
-        return [l[i] for i in resampling_idxs]
-
-    return l  # len of l was already within desired range

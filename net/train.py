@@ -87,7 +87,7 @@ class Trainer:
 
     def train(self, model, train_gen, val_gen, checkpoint=None):
         """
-        Trains a given model using the provided :class:`torch.data.DataLoader` generators.
+        Trains a given model using the provided :class:`torch.data.DataLoader` generator.
 
         :param torch.nn.Module model: the model to train.
         :param torch.utils.data.DataLoader train_gen: An iterator returning (images, y) pairs for training.

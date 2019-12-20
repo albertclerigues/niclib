@@ -26,38 +26,48 @@ class PatchSampling(ABC):
 
 
 class UniformSampling(PatchSampling):
-    def __init__(self, step, num_patches=None, masks=None):
-        """
-        :param step:
-        :param num_patches:
-        :param masks: TODO
-        """
+    """Uniform regular sampling of patch centers.
 
+    :param tuple step: extraction step as tuple (step_x, step_y, step_z)
+    :param int num_patches: (optional, default: None) By default all sampled centers are returned.
+        If num_patches is given, the centers are regularly resampled to the given number.
+    :param List[Any] masks: (optional) List of masks defininf the area where sampling will be performed.
+        To exclude a voxel, the value of ``mask[x,y,z]`` must evaluate to 0 or False.
+        Must contain same number of masks as ``images`` when sampling with the same (x, y, z) dimensions.
+    """
+
+    def __init__(self, step, num_patches=None, masks=None):
+        assert len(self.step) == 3
+        assert num_patches > 0
         self.step = step
         self.npatches = num_patches
         self.masks = masks
 
     def sample_centers(self, images, patch_shape):
-        patches_per_image = int(np.ceil(self.npatches / len(images))) if self.npatches is not None else None
-        if self.masks is not None:
-            return [sample_centers_uniform(img[0], patch_shape, self.step, patches_per_image, img_mask)
-                    for img, img_mask in zip(images, self.masks)]
-        else:
-            return [sample_centers_uniform(img[0], patch_shape, self.step, patches_per_image) for img in images]
+        assert len(patch_shape) == len(self.step) == 3
+        assert all(len(img.shape) == 4 for img in images)
+        assert all(img[0].shape == msk.shape for img, msk in zip(images, self.masks))
 
+        self.masks = [None] * len(images) if self.masks is None else self.masks
+        patches_per_image = int(np.ceil(self.npatches / len(images))) if self.npatches is not None else None
+        return [sample_centers_uniform(img[0], patch_shape, self.step, patches_per_image, img_mask)
+                for img, img_mask in zip(images, self.masks)]
 
 class BalancedSampling(PatchSampling):
-    def __init__(self, labels, num_patches, add_rand_offset=False):
+    def __init__(self, labels, num_patches, add_rand_offset=False, exclude_label=None):
         self.labels = labels
         self.npatches = num_patches
         self.add_rand_offset = add_rand_offset
+        self.exclude_label = exclude_label
 
     def sample_centers(self, images, patch_shape):
         assert len(images) == len(self.labels)
         assert all(img[0].shape == lbl.shape for img, lbl in zip(images, self.labels)), '{}, {}'.format(images[0].shape, self.labels[0].shape)
         patches_per_image = int(np.ceil(self.npatches / len(images)))
 
-        args = [[label_img, patch_shape, patches_per_image, self.add_rand_offset] for label_img in self.labels]
+        # In parallel to speed up computation
+        args = [[label_img, patch_shape, patches_per_image, self.add_rand_offset, self.exclude_label]
+                for label_img in self.labels]
         result = parallel_load(sample_centers_balanced, args, num_workers=12)
         return result
 
@@ -121,6 +131,17 @@ class PatchSet(TorchDataset):
         if instr.augment_function is not None:
             x_patch = instr.augment_function(x_patch)
         return torch.tensor(np.ascontiguousarray(x_patch), dtype=self.dtype)
+
+class SliceSet(TorchDataset):
+    # TODO
+    def __init__(self):
+        super().__init__()
+
+    def __len__(self):
+        pass
+
+    def __getitem__(self, index):
+        pass
 
 
 def _get_patch_slice(center, patch_shape):

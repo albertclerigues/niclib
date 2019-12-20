@@ -2,8 +2,8 @@ import torch
 
 from ..utils import print_progress_bar, RemainingTimeEstimator, save_nifti
 from ..__init__ import device as torch_device
-from ..generators import make_generator
-from ..generators.patch import PatchSet, sample_centers_uniform, _get_patch_slice
+from ..generator import make_generator
+from ..generator.patch import PatchSet, sample_centers_uniform, _get_patch_slice
 
 
 class PatchTester:

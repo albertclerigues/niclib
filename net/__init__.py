@@ -2,7 +2,6 @@ import warnings
 
 import torch
 
-from . import loss
 from . import test
 from . import train
 

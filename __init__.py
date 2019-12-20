@@ -27,8 +27,8 @@ device='cuda'
 #################################################################
 ## niclib namespace imports
 ## from .utils import *
-## from . import net, generators, data, metrics
+## from . import net, generator, data, metrics, loss, model
 
 from .utils import *
-from . import net, generators, data, metrics
+from . import net, generator, data, metrics, loss, model
 

@@ -1,4 +1,4 @@
-# niclib v0.3
+# niclib v0.3.1
 
 Niclib is a library for neuroimaging and deep learning, it includes specific utility functions and components to ease the implementation and design of deep learning pipelines. 
 
@@ -23,4 +23,10 @@ Niclib is a library for neuroimaging and deep learning, it includes specific uti
 
 #### eval
 - Metrics (DSC, MAE, MSE, SSIM ...)
+
+## Contribute
+
+Report a bug or issue: Use githubs issue tracker
+
+Repository branching workflow: https://nvie.com/posts/a-successful-git-branching-model/
 

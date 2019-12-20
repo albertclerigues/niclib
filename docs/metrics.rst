@@ -1,4 +1,4 @@
-Metrics
+Evaluation metrics
 ====================================
 
 .. automodule:: niclib.metrics

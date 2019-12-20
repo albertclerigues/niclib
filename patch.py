@@ -9,7 +9,7 @@ from torch.utils.data import Dataset as TorchDataset
 from .__init__ import resample_list, print_progress_bar
 from .data import compute_normalization_statistics
 
-warnings.warn('niclib.patch will move to niclib.generators.patch in next version', DeprecationWarning)
+warnings.warn('niclib.patch will move to niclib.generator.patch in next version', DeprecationWarning)
 
 
 

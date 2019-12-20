@@ -12,8 +12,3 @@ Network training
 .. automodule:: niclib.net.train
 	:members:
 	:show-inheritance:
-
-Losses
-***************************
-.. automodule:: niclib.net.loss
-	:members:
