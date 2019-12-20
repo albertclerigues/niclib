@@ -82,7 +82,7 @@ def lovasz_hinge(logits, labels, per_image=True, ignore=None):
     """
     Binary Lovasz hinge loss
       logits: [B, H, W] Variable, logits at each pixel (between -\infty and +\infty)
-      labels: [B, H, W] Tensor, binary ground truth masks (0 or 1)
+      label_img: [B, H, W] Tensor, binary ground truth masks (0 or 1)
       per_image: compute the loss per image instead of per batch
       ignore: void class id
     """
@@ -98,7 +98,7 @@ def lovasz_hinge_flat(logits, labels):
     """
     Binary Lovasz hinge loss
       logits: [P] Variable, logits at each prediction (between -\infty and +\infty)
-      labels: [P] Tensor, binary ground truth labels (0 or 1)
+      label_img: [P] Tensor, binary ground truth label_img (0 or 1)
       ignore: label to ignore
     """
     if len(labels) == 0:
@@ -117,7 +117,7 @@ def lovasz_hinge_flat(logits, labels):
 def flatten_binary_scores(scores, labels, ignore=None):
     """
     Flattens predictions in the batch (binary case)
-    Remove labels equal to 'ignore'
+    Remove label_img equal to 'ignore'
     """
     scores = scores.view(-1)
     labels = labels.view(-1)
@@ -143,7 +143,7 @@ def binary_xloss(logits, labels, ignore=None):
     """
     Binary Cross entropy loss
       logits: [B, H, W] Variable, logits at each pixel (between -\infty and +\infty)
-      labels: [B, H, W] Tensor, binary ground truth masks (0 or 1)
+      label_img: [B, H, W] Tensor, binary ground truth masks (0 or 1)
       ignore: void class id
     """
     logits, labels = flatten_binary_scores(logits, labels, ignore)
@@ -159,10 +159,10 @@ def lovasz_softmax(probas, labels, classes='present', per_image=False, ignore=No
     Multi-class Lovasz-Softmax loss
       probas: [B, C, H, W] Variable, class probabilities at each prediction (between 0 and 1).
               Interpreted as binary (sigmoid) output with outputs of size [B, H, W].
-      labels: [B, H, W] Tensor, ground truth labels (between 0 and C - 1)
-      classes: 'all' for all, 'present' for classes present in labels, or a list of classes to average.
+      label_img: [B, H, W] Tensor, ground truth label_img (between 0 and C - 1)
+      classes: 'all' for all, 'present' for classes present in label_img, or a list of classes to average.
       per_image: compute the loss per image instead of per batch
-      ignore: void class labels
+      ignore: void class label_img
     """
 
     if per_image:
@@ -177,8 +177,8 @@ def lovasz_softmax_flat(probas, labels, classes='present'):
     """
     Multi-class Lovasz-Softmax loss
       probas: [P, C] Variable, class probabilities at each prediction (between 0 and 1)
-      labels: [P] Tensor, ground truth labels (between 0 and C - 1)
-      classes: 'all' for all, 'present' for classes present in labels, or a list of classes to average.
+      label_img: [P] Tensor, ground truth label_img (between 0 and C - 1)
+      classes: 'all' for all, 'present' for classes present in label_img, or a list of classes to average.
     """
     if probas.numel() == 0:
         # only void pixels, the gradients should be 0

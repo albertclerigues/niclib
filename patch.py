@@ -42,7 +42,7 @@ class PatchSet(TorchDataset):
             self.centers += case_centers  # append center list
             self.centers_case_index += [case_index] * len(case_centers)  # append the case_index for each center
 
-        # Compute mean and variance for normalization
+        # Compute mean and variance for normalize
         self.do_normalize = normalize
         self.norm_stats = []
         if self.do_normalize:
@@ -91,7 +91,7 @@ class SliceSet(TorchDataset):
             self.slice_index += list(range(num_slices))  # append center list
             self.slice_index_case += [n] * num_slices  # append the case_index for each center
 
-        # Compute mean and variance for normalization
+        # Compute mean and variance for normalize
         self.do_normalize = normalize
         self.norm_stats = []
         if self.do_normalize:
@@ -333,7 +333,7 @@ def sample_centers_uniform(vol_shape, patch_shape, extraction_step, max_samples=
     """
 
     assert len(vol_shape) == len(patch_shape) == len(extraction_step), '{}, {}, {}'.format(vol_shape, patch_shape, extraction_step)
-    #print('vol_shape:{}, patch_shape:{}, extraction_step:{}'.format(vol_shape, patch_shape, extraction_step))
+    #print('vol_shape:{}, patch_shape:{}, step:{}'.format(vol_shape, patch_shape, step))
 
     if foreground is not None:
         assert len(foreground.shape) == len(vol_shape), '{}, {}'.format(foreground.shape, vol_shape)

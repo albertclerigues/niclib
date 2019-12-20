@@ -8,7 +8,7 @@ from abc import ABC
 import torch
 from torch import nn
 
-from ..__init__ import RemainingTimeEstimator
+from ..utils import RemainingTimeEstimator, remove_extension
 
 
 class Trainer:
@@ -157,10 +157,8 @@ class Trainer:
             self.loss.backward()  # Compute autograd weight gradients from loss
             self.model_optimizer.step()  # Update the weights according to gradients
 
-            # TODO test!
-            with torch.no_grad():
-                for k, eval_func in self.train_metric_funcs.items(): # Update training metrics
-                    self.train_metrics['train_{}'.format(k)] += eval_func(self.y_pred, self.y).item()
+            for k, eval_func in self.train_metric_funcs.items(): # Update training metrics
+                self.train_metrics['train_{}'.format(k)] += eval_func(self.y_pred, self.y).item()
 
             [plugin.on_train_batch_end(self, batch_idx) for plugin in self.plugins]
 
@@ -169,12 +167,11 @@ class Trainer:
             self.train_metrics[k] = float(v / len(self.train_gen))
 
     def validate_epoch(self):
-        self.model.eval()
-
         self.val_metrics = dict()
         for k in self.val_metric_funcs.keys():
             self.val_metrics['val_{}'.format(k)] = 0.0
 
+        self.model.eval()
         with torch.no_grad():  # Turns off autograd (faster exec)
             for batch_idx, (x, y) in enumerate(self.val_gen):
                 [plugin.on_val_batch_start(self, batch_idx) for plugin in self.plugins]
@@ -304,7 +301,7 @@ class ModelCheckpoint(TrainerPlugin):
         elif self.save == 'last':
             torch.save(trainer.model, self.filepath)
         elif self.save == 'all':
-            torch.save(trainer.model, self.filepath + '_{}.pt'.format(num_epoch))
+            torch.save(trainer.model, remove_extension(self.filepath) + '_{}.pt'.format(num_epoch))
         else:
             raise(ValueError, 'Save mode not valid')
 

@@ -6,25 +6,6 @@ import numpy as np
 from skimage import measure
 
 
-def reorient_nifti(nifti, reference=None):
-    """
-    TODO check
-
-    Reorients axis and orientation of `nifti` to match `reference`.
-    If no reference is provided then it is reoriented to canonical orientation (RAS).
-
-    :param nib.Nifti1Image() nifti: nifti to reorient
-    :param nib.Nifti1Image() reference: reference nifti for axis and orientation matching.
-    :return: the reoriented nifti
-    """
-    assert isinstance(nifti, nib.Nifti1Image)
-    if reference is None:
-        return nib.as_closest_canonical(nifti)
-    else:
-        assert isinstance(reference, nib.Nifti1Image)
-        return nifti.as_reoriented(nib.io_orientation(reference.affine))
-
-
 def normalize_by_range(img, new_range, old_range=None):
     """
     Scales the intensity range of the given array to the new range.
@@ -47,19 +28,18 @@ def normalize_by_range(img, new_range, old_range=None):
 
 
 def clip_percentile(img, percentile, ignore_zeros=False):
-    """
-    Clips image values according to the given percentile
+    """Clips image values according to the given percentile
+
     :param img:
-    :param percentile: either int or list,
-    :return:
+    :param percentile: the percentile as percent  or list with (low_percentile, high_percentile) where percentile is a number from 0 to 100.
+    :param ignore_zeros: (optional) if True, ignores the zero values in the computation of the percentile.
+    :return: the clipped image
+
+    :Example:
+
     """
     img_flat = img[np.nonzero(img)] if ignore_zeros else img
-
-    if isinstance(percentile, list):
-        low, high = np.percentile(img_flat, percentile)
-    else:
-        low, high = np.percentile(img_flat, [percentile, 100-percentile])
-
+    low, high = np.percentile(img_flat, percentile)
     return np.clip(img, low, high)
 
 

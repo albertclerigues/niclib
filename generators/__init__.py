@@ -1,24 +1,26 @@
 from torch.utils.data import Dataset as TorchDataset
 from torch.utils.data.dataloader import DataLoader
 
+from . import patch
+
 def make_generator(set, batch_size, shuffle, num_workers=4):
     return DataLoader(set, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers)
 
-class ZipSets(TorchDataset):
+class ZipSet(TorchDataset):
     def __init__(self, sets):
-        assert all([isinstance(set, DataLoader) for set in sets])
+        assert all([isinstance(set, TorchDataset) for set in sets])
         self.sets = sets
 
     def __len__(self):
-        return len(self.sets[0])
+        return min(len(s) for s in self.sets)
 
     def __getitem__(self, index):
         return tuple([dataset[index] for dataset in self.sets])
 
 
-class ChainSets(TorchDataset):
+class ChainSet(TorchDataset):
     def __init__(self, sets):
-        assert all([isinstance(s, DataLoader) for s in sets])
+        assert all([isinstance(s, TorchDataset) for s in sets])
         self.sets = sets
         self.index_to_set = [] # List with set idx, and subset idx
         for set_idx, s in enumerate(self.sets):

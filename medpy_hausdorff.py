@@ -1157,8 +1157,8 @@ def __distinct_binary_object_correspondences(reference, result, connectivity=1):
     
     # find all overlaps from labelmap2 to labelmap1; collect one-to-one relationships and store all one-two-many for later processing
     slicers = find_objects(labelmap2) # get windows of labelled objects
-    mapping = dict() # mappings from labels in labelmap2 to corresponding object labels in labelmap1
-    used_labels = set() # set to collect all already used labels from labelmap2
+    mapping = dict() # mappings from label_img in labelmap2 to corresponding object label_img in labelmap1
+    used_labels = set() # set to collect all already used label_img from labelmap2
     one_to_many = list() # list to collect all one-to-many mappings
     for l1id, slicer in enumerate(slicers): # iterate over object in labelmap2 and their windows
         l1id += 1 # labelled objects have ids sarting from 1

@@ -2,18 +2,16 @@ import numpy as np
 
 from .medpy_hausdorff import hd as haussdorf_dist
 
-
 # TODO use torch versions to also use GPU if available
-
 def compute_metrics(outputs, targets, metrics, ids=None):
     """
     Computes evaluation metrics for the given images.
 
     :param outputs: list of output images
     :param targets: list of gold standard images
-    :param metrics: dictionary containing the functions for metric computation
-    :param ids: (Optional) list of image pair identifiers
-    :return: list of dictionaries containing the metrics for each given sample pair
+    :param metrics: dictionary containing each metric with key, value pairs as {metric_name: metric_function}
+    :param ids: (Optional) list of image identifiers
+    :return: list of dictionaries containing the metrics for each given sample
     """
     assert len(outputs) == len(targets)
     assert isinstance(metrics, dict)
@@ -68,8 +66,8 @@ def haussdorf_distance(output: np.ndarray, target: np.ndarray):
 def dsc(output, target, background_label=0):
     """Dice Similarity Coefficient
 
-    :param output: class labels of segmentation
-    :param target: class labels of ground truth
+    :param output: class label_img of segmentation
+    :param target: class label_img of ground truth
     :param background_label:
 
     :Example:
