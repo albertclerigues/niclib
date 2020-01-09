@@ -20,13 +20,18 @@ class uResNet_guerrero(nn.Module):
     :param num_base_filters: number of filters in the first resolution step.
         The number of filters is doubled in each of the four resolution steps.
         The number of channels in the latent space will be equal to ``8 * num_base_filters``.
+    :param bool skip_connections: (default: True) wether or not to have skip connections between encoder and
+        decoder branches of the uResNet. This is useful for autoencoders where they would be a direct shortcut and
+        prevent the latent space from learning useful features.
     """
 
-    def __init__(self, in_ch, out_ch, ndims, activation=None, num_base_filters=32):
+    def __init__(self, in_ch, out_ch, ndims, activation=None, num_base_filters=32, skip_connections=True):
         super().__init__()
         Conv = nn.Conv2d if ndims is 2 else nn.Conv3d
         ConvTranspose = nn.ConvTranspose2d if ndims is 2 else nn.ConvTranspose3d
         MaxPool = nn.MaxPool2d if ndims is 2 else nn.MaxPool3d
+
+        self.use_skip = skip_connections
 
         self.enc_res1 = _ResEle(in_ch, num_base_filters, ndims=ndims)
         self.enc_res2 = _ResEle(1 * num_base_filters, 2 * num_base_filters, ndims=ndims)
@@ -67,13 +72,13 @@ class uResNet_guerrero(nn.Module):
         r4_start = self.deconv1(l4_end)
         r4_end = self.dec_res1(r4_start)
 
-        r3_start = self.dec_res2(r4_end + l3_end)
+        r3_start = self.dec_res2(r4_end + l3_end) if self.use_skip else self.dec_res2(r4_end)
         r3_end = self.deconv2(r3_start)
 
-        r2_start = self.dec_res3(r3_end + l2_end)
+        r2_start = self.dec_res3(r3_end + l2_end) if self.use_skip else self.dec_res3(r3_end)
         r2_end = self.deconv3(r2_start)
 
-        r1_start = self.dec_res4(r2_end + l1_end)
+        r1_start = self.dec_res4(r2_end + l1_end) if self.use_skip else self.dec_res4(r2_end)
         pred = self.out_conv(r1_start)
 
         if self.activation is not None:

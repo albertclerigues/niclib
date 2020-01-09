@@ -31,14 +31,15 @@ class UniformSampling(PatchSampling):
     :param tuple step: extraction step as tuple (step_x, step_y, step_z)
     :param int num_patches: (optional, default: None) By default all sampled centers are returned.
         If num_patches is given, the centers are regularly resampled to the given number.
-    :param List[Any] masks: (optional) List of masks defininf the area where sampling will be performed.
+    :param List[Any] masks: (optional) List of masks defining the area where sampling will be performed.
         To exclude a voxel, the value of ``mask[x,y,z]`` must evaluate to 0 or False.
         Must contain same number of masks as ``images`` when sampling with the same (x, y, z) dimensions.
     """
 
     def __init__(self, step, num_patches=None, masks=None):
-        assert len(self.step) == 3
-        assert num_patches > 0
+        assert len(step) == 3
+        if num_patches is not None:
+            assert num_patches > 0
         self.step = step
         self.npatches = num_patches
         self.masks = masks
@@ -46,7 +47,8 @@ class UniformSampling(PatchSampling):
     def sample_centers(self, images, patch_shape):
         assert len(patch_shape) == len(self.step) == 3
         assert all(len(img.shape) == 4 for img in images)
-        assert all(img[0].shape == msk.shape for img, msk in zip(images, self.masks))
+        if self.masks is not None:
+            assert all(img[0].shape == msk.shape for img, msk in zip(images, self.masks))
 
         self.masks = [None] * len(images) if self.masks is None else self.masks
         patches_per_image = int(np.ceil(self.npatches / len(images))) if self.npatches is not None else None
@@ -54,6 +56,15 @@ class UniformSampling(PatchSampling):
                 for img, img_mask in zip(images, self.masks)]
 
 class BalancedSampling(PatchSampling):
+    """Balanced patch sampling of the given label map.
+
+    :param labels: a list of label arrays that correspond to each of the provided images to PatchSet.
+    :param int num_patches:
+    :param bool add_rand_offset: (default: False) wether to add a random offset to the sampling
+        point of up to half of the patch size (so that originally sampled voxel is still contained in the patch).
+    :param list exclude_label: list of labels to exclude
+    """
+
     def __init__(self, labels, num_patches, add_rand_offset=False, exclude_label=None):
         self.labels = labels
         self.npatches = num_patches
@@ -77,17 +88,30 @@ def _norm_patch(x):
     return np.divide(x - channel_means, channel_stds)
 
 class PatchSet(TorchDataset):
-    def  __init__(self, images, patch_shape, sampling, normalize, dtype=torch.float, centers=None):
-        """
-        Creates a torch dataset that returns patches extracted from images.
+    """
+    Creates a torch dataset that returns patches extracted from images either from predefined extraction centers or
+    using a predefined patch sampling strategy.
 
-        :param List[np.ndarray] images: list of images with shape (C, X, Y, Z)
-        :param PatchSampling sampling:
-        :param normalize: one of ``'none'``, ``'patch'``, ``'image'``.
-        :param dtype: the desired output data type (de"ault: torch.float)
-        :param List[List[tuple]] centers: (optional) a list containing a list of centers for each provided image.
-        If provided it overrides the sampling and directly uses the provided centers to extract the patches.
-        """
+    :param List[np.ndarray] images: list of images with shape (CH, X, Y, Z)
+    :param PatchSampling sampling: An object of type PatchSampling defining the patch sampling strategy.
+    :param normalize: one of ``'none'``, ``'patch'``, ``'image'``.
+    :param dtype: the desired output data type (default: torch.float)
+    :param List[List[tuple]] centers: (optional) a list containing a list of centers for each provided image.
+        If provided it ignores the given sampling and directly uses the centers to extract the patches.
+
+    :Example:
+
+    >>> images = [np.ones((1, 100,100,100)) for _ in range(10)]
+    >>> patch_set = PatchSet(
+    >>>     images, patch_shape=(2, 1, 1), sampling=UniformSampling(step=(10, 10, 10)), normalize='none')
+    >>> print(len(patch_set))
+    10000
+    >>> print(patch_set[0])
+    tensor([[[[1.]],
+         [[1.]]]])
+    """
+
+    def  __init__(self, images, patch_shape, sampling, normalize, dtype=torch.float, centers=None):
         assert all([img.ndim == 4 for img in images]), 'Images must be numpy ndarrays with dimensions (C, X, Y, Z)'
         assert len(patch_shape) == 3
         assert normalize in ['none', 'patch', 'image']
@@ -108,17 +132,17 @@ class PatchSet(TorchDataset):
                 means = np.mean(self.images[image_idx], axis=(1,2,3), keepdims=True, dtype=np.float64)
                 stds = np.std(self.images[image_idx], axis=(1,2,3), keepdims=True, dtype=np.float64)
 
-                # BY PROVIDING MEANS AND STDS AS DEFAULT ARGUMENTS, WE MAKE A COPY of their values inside norm_func
-                # If not, the means and stds would be of the last value (last image) leading to incorrect results
+                # BY PROVIDING MEANS AND STDS AS ARGUMENTS WITH DEFAULT VALUES, WE MAKE A COPY of their values inside
+                # norm_func. If not, the means and stds would be of the last stored value (last image's statistics)
+                # leading to incorrect results
                 norm_func = lambda x, m=means, s=stds : (x - m) / s
             else:
-                norm_func = lambda x : x  # Identity function (normalize == 'none')
+                # Identity function (normalize == 'none')
+                norm_func = lambda x : x
 
             ## Generate instructions
             self.instructions += [PatchInstruction(
                 image_idx, center=center, shape=patch_shape, normalize_function=norm_func) for center in image_centers]
-
-        print("Created PatchSet with {} patches".format(len(self.instructions)))
 
     def __len__(self):
         return len(self.instructions)

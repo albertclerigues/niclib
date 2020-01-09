@@ -12,20 +12,22 @@ from ..utils import RemainingTimeEstimator, remove_extension
 
 
 class Trainer:
-    """Class for torch Module training using a training and validation set with basic metric supprt.
-    It also has support for plugins, a way to embed functionality in the training procedure.
+    """Class for torch Module training using training and validation generators with basic metric supprt.
+    It also has support for plugins, a way to embed any functionality in the training procedure.
 
-    Plugins are made by inheriting from the base class :py:class:`~niclib.net.train.TrainerPlugin` and overriding
-    the inherited functions to implement the desired functionality.
-
-    :param int max_epochs: maximum number of epochs to train. Training can be interrupted by setting the attribute `keep_training` to False.
+    :param int max_epochs: maximum number of epochs to train. Training can be interrupted with a plugin by setting the
+        attribute `keep_training` to False.
     :param torch.nn.Module loss_func: loss function.
     :param optimizer: torch.optim.Optimizer derived optimizer.
-    :param dict train_metrics: dictionary with the desired metrics as key value pairs specifiying the metric name and the function object (callable) respectively. The loss function is automatically included under the key 'loss'.
+    :param dict train_metrics: dictionary with the desired metrics as key value pairs specifiying the metric name and
+        the function object (callable) respectively. The loss function is automatically included under the key 'loss'.
     :param dict val_metrics: same as `train_metrics`.
-    :param list plugins: List of plugin objects.
-    :param torch.device device: torch torch_device i.e. 'cpu', 'cuda', 'cuda:0'...
+    :param list plugins: List of plugin objects (inheriting from ``TrainerPlugin``).
+    :param str device: torch torch_device i.e. 'cpu', 'cuda', 'cuda:0'...
+    :param bool multigpu: (default: False) if True, it instances the model as a DataParallel model before training.
 
+    Plugins are made by inheriting from the base class :py:class:`~niclib.net.train.TrainerPlugin` and overriding
+    the inherited functions to implement the desired functionality at specific points during the training.
     Runtime variables accesible to the plugins via the input argument `trainer`.
 
     :var bool keep_training: control flag to continue or interrupt the training. Checked at the start of each epoch.
@@ -35,12 +37,13 @@ class Trainer:
     :var torch.utils.data.DataLoader val_gen:
     :var dict train_metrics:
     :var dict val_metrics:
-    :var torch.Tensor images:
+    :var torch.Tensor x:
     :var torch.Tensor y:
     :var torch.Tensor y_pred:
     :var torch.Tensor loss:
     """
-    def __init__(self, max_epochs, loss_func, optimizer, optimizer_opts=None, train_metrics=None, val_metrics=None, plugins=None, device='cuda', multigpu=False, visible_gpus='0'):
+
+    def __init__(self, max_epochs, loss_func, optimizer, optimizer_opts=None, train_metrics=None, val_metrics=None, plugins=None, device='cuda', multigpu=False):
         assert all([isinstance(plugin, TrainerPlugin) for plugin in plugins])
         if train_metrics is not None:
             assert isinstance(train_metrics, dict) and all([callable(m) for m in train_metrics.values()])
@@ -50,7 +53,6 @@ class Trainer:
         # Basic training variables
         self.device = device
         self.use_multigpu = multigpu
-        self.visible_gpus = visible_gpus if isinstance(visible_gpus, str) else ','.join(visible_gpus)
 
         self.max_epochs = max_epochs
         self.loss_func = loss_func
@@ -90,8 +92,8 @@ class Trainer:
         Trains a given model using the provided :class:`torch.data.DataLoader` generator.
 
         :param torch.nn.Module model: the model to train.
-        :param torch.utils.data.DataLoader train_gen: An iterator returning (images, y) pairs for training.
-        :param torch.utils.data.DataLoader val_gen: An iterator returning (images, y) pairs for validation.
+        :param torch.utils.data.DataLoader train_gen: An iterator returning (x, y) pairs for training.
+        :param torch.utils.data.DataLoader val_gen: An iterator returning (x, y) pairs for validation.
         :param dict checkpoint: (optional) checkpoint that can include 'epoch', 'model', 'optimizer' or 'loss'
         :return torch.nn.Module: the trained model.
         """
@@ -112,9 +114,8 @@ class Trainer:
 
         self.model = model.to(self.device)
         if self.use_multigpu:
-            print("Using multigpu for training with GPUs {}".format(self.visible_gpus))
+            print("Using multigpu for training")
             self.model = nn.DataParallel(self.model)
-            os.environ['CUDA_VISIBLE_DEVICES'] = self.visible_gpus
 
         print("Training model for {} epochs".format(self.max_epochs))
         [plugin.on_train_start(self) for plugin in self.plugins]
@@ -139,11 +140,13 @@ class Trainer:
         return self.model
 
     def train_epoch(self):
-        self.model.train()
+        self.model.train() # Set the model in training mode (for correct dropout, batchnorm, etc.)
 
+        # Prepare the metrics data structure
         self.train_metrics = dict()
         for k in self.train_metric_funcs.keys():
             self.train_metrics['train_{}'.format(k)] = 0.0
+
 
         for batch_idx, (x, y) in enumerate(self.train_gen):
             [plugin.on_train_batch_start(self, batch_idx) for plugin in self.plugins]
@@ -154,15 +157,15 @@ class Trainer:
             self.y_pred = self.model(self.x)  # Forward pass
             self.loss = self.loss_func(self.y_pred, self.y)  # Loss computation
 
-            self.loss.backward()  # Compute autograd weight gradients from loss
-            self.model_optimizer.step()  # Update the weights according to gradients
+            self.loss.backward()  # Compute autograd gradients from loss
+            self.model_optimizer.step()  # Update the weights according to optimizer scaled gradients
 
             for k, eval_func in self.train_metric_funcs.items(): # Update training metrics
                 self.train_metrics['train_{}'.format(k)] += eval_func(self.y_pred, self.y).item()
 
             [plugin.on_train_batch_end(self, batch_idx) for plugin in self.plugins]
 
-        # Compute average metrics
+        # Compute average metrics for epoch
         for k, v in self.train_metrics.items():
             self.train_metrics[k] = float(v / len(self.train_gen))
 
@@ -226,6 +229,12 @@ class TrainerPlugin(ABC):
     where:
 
     :param trainer: :py:class:`Trainer <niclib.net.train.Trainer>` instance that grants access to all its runtime attributes i.e. ``trainer.model``, ``trainer.train_gen``...
+    :param num_epoch: current epoch number (starting at 0)
+    :param batch_idx: current batch iteration (starting at 0)
+
+    :Example:
+
+    >>> print('TODO')
 
     """
     def on_init(self, trainer):
@@ -266,8 +275,8 @@ class ModelCheckpoint(TrainerPlugin):
     """
     :param filepath: filepath for checkpoint storage
     :param str save: save mode, either ``best``, ``all`` or ``last``.
-    :param metric_name: only for ``save='best'`` name of the monitored metric for
-    :param str mode: either ``min`` or ``max``
+    :param metric_name: (only for ``save='best'``) name of the monitored metric to evaluate the model and store.
+    :param str mode: either ``min`` or ``max`` of the monitored metric to store the model.
     """
 
     def __init__(self, filepath, save='best', metric_name='loss', mode='min', min_delta=1e-4):
@@ -316,7 +325,7 @@ class EarlyStopping(TrainerPlugin):
     :param min_delta: minimum change between metric values to consider a new best model.
     """
 
-    def __init__(self, metric_name, patience, min_delta=1e-4):
+    def __init__(self, metric_name, patience, min_delta=1e-5):
         self.min_delta = min_delta
 
         self.metric_name = metric_name

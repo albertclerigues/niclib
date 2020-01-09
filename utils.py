@@ -92,19 +92,21 @@ def remove_extension(filepath):
 def parallel_load(load_func, arguments, num_workers):
     """Loads a dataset using parallel threads for faster load times (especially of .nii.gz files).
 
-    :param callable load_func: function that loads and returns one dataset element. It can return any type and have any number of positional arguments.
-    :param arguments: (List[Any] or List[List[Any]]) list containing the load_func arguments for each dataset element to load. If load_func has more than one argument, the arguments must be provided as a list. The function is called as ``load_func(*arguments[i])`` to load the i :sup:`th` element.
+    :param callable load_func: function that loads and returns one dataset element.
+        It can return any type and have any number of positional arguments.
+    :param arguments: (List[Any] or List[List[Any]]) list containing the load_func arguments for each dataset
+        element to load. If load_func has more than one argument, the arguments must be provided as a list.
+        The function is called as ``load_func(*arguments[i])`` to load the i :sup:`th` element.
     :param int num_workers: number of parallel workers to use.
     :return: A list with the loaded dataset elements
 
     :Example:
 
     >>> def load_case(case_path):
-    >>>     return {'t1': nibabel.load(os.path.join(case_path, 't1.nii.gz')).get_data(),
-    >>>             'gt': nibabel.load(os.path.join(case_path, 'gt.nii.gz')).get_data()}
+    >>>     return nibabel.load(os.path.join(case_path, 't1.nii.gz')).get_data()
     >>>
-    >>> dataset = parallel_load(load_case, [['data/pt_01'], ['data/pt_02'],['data/pt_03']])
-    >>> print(dataset[0]['t1'].shape)
+    >>> dataset = parallel_load(load_case, ['data/pt_01', 'data/pt_02', 'data/pt_03'])
+    >>> print(dataset[0].shape)
     (182, 218, 182)
     """
     assert callable(load_func), 'load_func must be a function handler'
@@ -137,7 +139,8 @@ def save_nifti(filepath, volume, dtype=None, reference=None, channel_handling='n
         is useful to visualize images as multi-component data in *ITK-SNAP*. If ``'split'``, then the image channels
         are each stored in a different nifti file.
     """
-    # Multichannel images
+
+    # Multichannel image handling
     assert channel_handling in {'none', 'last', 'split'}
     if len(volume.shape) == 4 and channel_handling != 'none':
         if channel_handling == 'last':
@@ -146,6 +149,7 @@ def save_nifti(filepath, volume, dtype=None, reference=None, channel_handling='n
             for n, channel in enumerate(volume):
                 savename = '{}_ch{}.nii.gz'.format(remove_extension(filepath), n)
                 save_nifti(savename, channel, dtype=dtype, reference=reference)
+            return
 
     if dtype is not None:
         volume = volume.astype(dtype)
@@ -212,20 +216,20 @@ def resample_list(l, n):
     >>> resample_list([0, 1, 2, 3], n=6)
     [0, 1, 2, 3, 0, 2]
     """
-    l = np.asarray(l)
-    if len(l) == n:
-        return l
-
     if len(l) < n:  # List smaller than n (Repeat elements)
-        resampling_idxs = np.asarray(list(range(len(l))) * (n // len(l)))  # Full repetitions
+        resampling_idxs = list(range(len(l))) * (n // len(l))  # Full repetitions
         if len(resampling_idxs) < n:  # Partial repetitions
             resampling_idxs += np.arange(
                 start=0.0, stop=float(len(l)) - 1.0, step=len(l) / float(n % len(l))).astype(int).tolist()
+        return [l[i] for i in resampling_idxs]
 
     if len(l) > n:  # List bigger than n (Subsample elements)
-        resampling_idxs = np.arange(start=0.0, stop=float(len(l)) - 1.0, step=len(l) / float(n)).astype(int)
+        resampling_idxs = np.arange(start=0.0, stop=float(len(l)) - 1.0, step=len(l) / float(n)).astype(int).tolist()
+        return [l[i] for i in resampling_idxs]
 
-    return list(l[resampling_idxs])
+    if len(l) == n:
+        return l
+
 
 
 def split_list(l, fraction=None, indexes=None):

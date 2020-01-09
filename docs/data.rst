@@ -1,5 +1,5 @@
 ################
-Data processing
+Data operations
 ################
 
 .. automodule:: niclib.data

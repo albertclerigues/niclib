@@ -64,7 +64,7 @@ def clip_percentile(img, percentile, ignore_zeros=False):
 
 
 def get_largest_connected_component(segmentation):
-    """Returns the largest connected component of a binary segmentation."""
+    """Returns only the largest connected component of a binary segmentation."""
     labels = measure.label(segmentation) # Get connected components
     if labels.max() != 0: # assume at least 1 CC
         warnings.warn(UserWarning, 'Getting largest connected component of empty segmentation')
@@ -123,6 +123,7 @@ def crop_borders(image, background_value=0):
     :param background_value: value of the background that will be cropped.
     :return: The image with background borders cropped.
     """
+
     if not isinstance(image, np.ndarray):
         image = np.asanyarray(image)
     foreground = (image != background_value)
@@ -139,14 +140,6 @@ def crop_borders(image, background_value=0):
 
 
 
-
-
-
-
-
-
-
-
 def histogram_matching(reference_filepath, input_filepath, output_filepath, hist_levels=256, match_points=15, mean_thresh=True):
     """Performs MRI histogram matching [#f1]_ using Simple ITK.
 
@@ -156,7 +149,7 @@ def histogram_matching(reference_filepath, input_filepath, output_filepath, hist
 
     :param reference_filepath: Filepath of nifti image for reference histogram.
     :param input_filepath: Filepath of nifti image to transform.
-    :param output_filepath: Filepath of output image with histogram matched to reference.
+    :param output_filepath: Filepath of output image (input with histogram matched to reference).
     """
     assert all([fp.endswith('.nii') or fp.endswith('.nii.gz')
                 for fp in {reference_filepath, input_filepath, output_filepath}])

@@ -4,19 +4,24 @@
    contain the root `toctree` directive.
 
 ##################################
-niclib documentation
+niclib docs
 ##################################
 
-Niclib is a utility library to ease the development of neuroimaging pipelines using deep learning.
+niclib is a utility library to ease the development of neuroimaging pipelines using deep learning.
 This library attempts to offers a simple interface to commonly used functions and procedures when dealing with
-file storage, data operations, loss functions, evaluation metrics.
+file storage, data operations, data and patch generators, network training, loss functions and evaluation metrics.
+
+This library does't aim to be a complete replacement of other deep learning or neuroimaging libraries.
+If more advanced functionality is required, we encourage the user to use the provided code as a starting point to
+implement their own needs.
+
 
 .. toctree::
    :maxdepth: 2
    :caption: Module documentation
 
    niclib utils <builtins>
-   Data processing <data>
+   Data operations <data>
    Data generators <generator>
    Predefined models <models>
    Networks <network>
