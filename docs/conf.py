@@ -13,8 +13,9 @@
 import os
 import sphinx_rtd_theme
 import sys
-sys.path.insert(0, os.path.expanduser('~/mic_home/my_libraries/niclib'))
 
+import niclib
+#sys.path.insert(0, os.path.expanduser('~/mic_home/my_libraries/niclib/src/niclib'))
 
 # -- Project information -----------------------------------------------------
 project = 'niclib'
@@ -42,6 +43,8 @@ templates_path = ['_templates']
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = []
 pygments_style='friendly'
+#pygments_style='tango'
+#pygments_style='igor'
 
 # -- Options for HTML output -------------------------------------------------
 

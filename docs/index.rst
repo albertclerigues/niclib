@@ -15,6 +15,14 @@ This library does't aim to be a complete replacement of other deep learning or n
 If more advanced functionality is required, we encourage the user to use the provided code as a starting point to
 implement their own needs.
 
+Installation
+************
+
+niclib only requirement is Python 3.6, the library can then be installed using pip:
+
+.. code-block:: none
+
+   pip3 install https://nic.udg.edu/niclib/wheels/niclib-0.5b-py3-none-any.whl
 
 .. toctree::
    :maxdepth: 2
