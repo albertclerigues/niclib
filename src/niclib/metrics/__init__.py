@@ -149,6 +149,11 @@ def dsc(output, target, background_label=0):
 
     return _convert_to_scalar(result, was_numpy)
 
+def accuracy(output, target, class_dim=1):
+    """Accuracy defined as: mean(argmax(output) == argmax(target))"""
+    return torch.mean(torch.eq(torch.argmax(output, dim=class_dim), torch.argmax(target, dim=class_dim)).float())
+
+
 def mse(output, target, ignore_zeros=False):
     """Mean squared error"""
     output, target, was_numpy = _convert_to_torch(output, target)
