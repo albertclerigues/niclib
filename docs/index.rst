@@ -22,7 +22,7 @@ niclib only requirement is Python 3.6, the library can then be installed using p
 
 .. code-block:: none
 
-   pip3 install https://nic.udg.edu/niclib/wheels/niclib-0.5b-py3-none-any.whl
+   pip3 install https://nic.udg.edu/niclib/wheels/niclib-0.5.1b-py3-none-any.whl
 
 .. toctree::
    :maxdepth: 2
