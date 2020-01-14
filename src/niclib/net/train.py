@@ -95,7 +95,7 @@ class Trainer:
         :param torch.utils.data.DataLoader train_gen: An iterator returning (x, y) pairs for training.
         :param torch.utils.data.DataLoader val_gen: An iterator returning (x, y) pairs for validation.
         :param dict checkpoint: (optional) checkpoint that can include 'epoch', 'model', 'optimizer' or 'loss'
-        :return torch.nn.Module: the trained model.
+        :return: None, after training you should load the stored model from disk using torch.load()
         """
 
         # Store given arguments in runtime variables to be available to plugins
@@ -136,8 +136,6 @@ class Trainer:
 
         print("Training finished\n")
         [plugin.on_train_end(self) for plugin in self.plugins]
-
-        return self.model
 
     def train_epoch(self):
         self.model.train() # Set the model in training mode (for correct dropout, batchnorm, etc.)

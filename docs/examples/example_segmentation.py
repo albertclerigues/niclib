@@ -15,11 +15,10 @@ print("Loading training dataset with {} images...".format(len(case_paths)))
 def load_case(case_path):
     t1_img = nib.load(os.path.join(case_path, 't1.nii.gz')).get_data()
     t1_img = np.expand_dims(t1_img, axis=0) # Add single channel modality
-
     tissue_filepaths = [os.path.join(case_path, 'fast_3c/fast_pve_{}.nii.gz'.format(i)) for i in range(3)]
     tissue_probabilties = np.stack([nib.load(tfp).get_data() for tfp in tissue_filepaths], axis=0)
-
     return {'t1': t1_img, 'probs': tissue_probabilties}
+
 dataset = nl.parallel_load(load_func=load_case, arguments=case_paths, num_workers=12)
 
 dataset_train, dataset_val = nl.split_list(dataset, fraction=0.8) # Split images into train and validation
@@ -30,26 +29,38 @@ print('Training dataset with {} train and {} val images'.format(len(dataset_trai
 train_sampling = nl.generator.BalancedSampling(
     labels=[np.argmax(case['probs'], axis=0) for case in dataset_train],
     num_patches=1000 * len(dataset_train))
+
 train_patch_set = nl.generator.ZipSet([
     nl.generator.PatchSet(
         images=[case['t1'] for case in dataset_train],
-        patch_shape=(32, 32, 32),normalize='image', sampling=train_sampling),
+        patch_shape=(32, 32, 32),
+        normalize='image',
+        sampling=train_sampling),
     nl.generator.PatchSet(
         images=[case['probs'] for case in dataset_train],
-        patch_shape=(32, 32, 32), normalize='image', sampling=train_sampling)])
+        patch_shape=(32, 32, 32),
+        normalize='image',
+        sampling=train_sampling)])
+
 train_gen = nl.generator.make_generator(set=train_patch_set, batch_size=32, shuffle=True)
 
 
 val_sampling = nl.generator.BalancedSampling(
     labels=[np.argmax(case['probs'], axis=0) for case in dataset_val],
     num_patches=1000 * len(dataset_val))
+
 val_patch_set = nl.generator.ZipSet([
     nl.generator.PatchSet(
         images=[case['t1'] for case in dataset_val],
-        patch_shape=(32, 32, 32), normalize='image', sampling=val_sampling),
+        patch_shape=(32, 32, 32),
+        normalize='image',
+        sampling=val_sampling),
     nl.generator.PatchSet(
         images=[case['probs'] for case in dataset_val],
-        patch_shape=(32, 32, 32), normalize='image', sampling=val_sampling)])
+        patch_shape=(32, 32, 32),
+        normalize='image',
+        sampling=val_sampling)])
+
 val_gen = nl.generator.make_generator(set=val_patch_set, batch_size=32, shuffle=True)
 
 print("Train and val patch generators with {} and {} patches".format(len(train_patch_set), len(val_patch_set)))
@@ -81,14 +92,17 @@ trainer = nl.net.train.Trainer(
         nl.net.train.EarlyStopping(metric_name='loss', patience=5)],
     device='cuda:1')
 
-guerrero_trained = trainer.train(guerrero_model, train_gen, val_gen)
-
+trainer.train(guerrero_model, train_gen, val_gen)
+guerrero_trained = torch.load(checkpoints_path + 'tissue_seg_net.pt')
 
 ### 4. Finally, use the trained model to autoencode a sample image
 results_path = nl.make_dir('results/')
 predictor = nl.net.test.PatchTester(
-    patch_shape=(1, 32, 32, 32), patch_out_shape=(3, 32, 32, 32),
-    extraction_step=(16, 16, 16), normalize='image', activation=torch.nn.Softmax(dim=1))
+    patch_shape=(1, 32, 32, 32),
+    patch_out_shape=(3, 32, 32, 32),
+    extraction_step=(16, 16, 16),
+    normalize='image',
+    activation=torch.nn.Softmax(dim=1))
 
 for n, test_case_path in enumerate(test_case_paths):
     # Load test image and

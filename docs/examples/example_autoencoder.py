@@ -4,7 +4,6 @@ import numpy as np
 import nibabel as nib
 import niclib as nl
 
-
 ### 1. Dataset load
 data_path = '/media/user/dades/DATASETS/campinas-mini'
 case_paths = [f.path for f in os.scandir(data_path) if f.is_dir()]
@@ -24,14 +23,25 @@ print('Training dataset with {} train and {} val images'.format(len(dataset_trai
 
 ### 2. Create training and validation patch generators
 train_patch_set = nl.generator.PatchSet(
-	images=dataset_train, patch_shape=(32, 32, 32), normalize='none',
-    sampling=nl.generator.UniformSampling(step=(16, 16, 16), num_patches=500 * len(dataset_train)))
+	images=dataset_train,
+    patch_shape=(32, 32, 32),
+    normalize='none',
+    sampling=nl.generator.UniformSampling(
+        step=(16, 16, 16),
+        num_patches=500 * len(dataset_train)))
+
 train_gen = nl.generator.make_generator(
     set=nl.generator.ZipSet([train_patch_set, train_patch_set]), batch_size=32, shuffle=True)
 
+
 val_patch_set = nl.generator.PatchSet(
-    images=dataset_val, patch_shape=(32, 32, 32), normalize='none',
-    sampling=nl.generator.UniformSampling(step=(16, 16, 16), num_patches=500 * len(dataset_val)))
+    images=dataset_val,
+    patch_shape=(32, 32, 32),
+    normalize='none',
+    sampling=nl.generator.UniformSampling(
+        step=(16, 16, 16),
+        num_patches=500 * len(dataset_val)))
+
 val_gen = nl.generator.make_generator(
     set=nl.generator.ZipSet([val_patch_set, val_patch_set]), batch_size=32, shuffle=True)
 
@@ -55,12 +65,18 @@ trainer = nl.net.train.Trainer(
         nl.net.train.EarlyStopping(metric_name='loss', patience=5)],
     device='cuda')
 
-guerrero_trained = trainer.train(guerrero_model, train_gen, val_gen)
+trainer.train(guerrero_model, train_gen, val_gen)
+guerrero_trained = torch.load(checkpoints_path + 'example_autoencoder.pt')
 
 ### 4. Finally, use the trained model to autoencode a sample image
 results_path = nl.make_dir('results/')
 predictor = nl.net.test.PatchTester(
-    patch_shape=(1, 32, 32, 32), extraction_step=(16, 16, 16), normalize='none', activation=None)
+    patch_shape=(1, 32, 32, 32),
+    patch_out_shape=(1, 32, 32, 32),
+    extraction_step=(16, 16, 16),
+    normalize='none',
+    activation=None)
+
 for n, test_case_path in enumerate(test_case_paths):
     # Load test image and add single channel dim to obtain 4 dimensions as (CH, X, Y, Z)
     test_nifti = nib.load(os.path.join(test_case_path, 't1.nii.gz'))
