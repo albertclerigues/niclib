@@ -109,7 +109,8 @@ def parallel_load(load_func, arguments, num_workers):
     >>> print(dataset[0].shape)
     (182, 218, 182)
     """
-    assert callable(load_func), 'load_func must be a function handler'
+
+    assert callable(load_func), 'load_func must be a callable function'
     # Adjust for variadic positional arguments (i.e. the * in fn(*args)) that need a list of arguments to work
     if all([not isinstance(arg, list) for arg in arguments]):
         arguments = [[arg] for arg in arguments]
@@ -120,9 +121,14 @@ def parallel_load(load_func, arguments, num_workers):
         dataset[n_] = load_func(*args_)
 
     # Parallel load the dataset
+    future_tasks = []
     pool = ThreadPoolExecutor(max_workers=num_workers)
     for n, args in enumerate(arguments):
-        pool.submit(_run_load_func, n, args)
+        future_tasks.append(pool.submit(_run_load_func, n, args))
+
+    # Check if any exceptions occured during loading
+    [future_task.result() for future_task in future_tasks]
+
     pool.shutdown(wait=True)
     return dataset
 
@@ -216,8 +222,12 @@ def resample_list(l, n):
     >>> resample_list([0, 1, 2, 3], n=6)
     [0, 1, 2, 3, 0, 2]
     """
+    assert n == int(n)
+    n = int(n)
+
     if len(l) < n:  # List smaller than n (Repeat elements)
         resampling_idxs = list(range(len(l))) * (n // len(l))  # Full repetitions
+
         if len(resampling_idxs) < n:  # Partial repetitions
             resampling_idxs += np.arange(
                 start=0.0, stop=float(len(l)) - 1.0, step=len(l) / float(n % len(l))).astype(int).tolist()

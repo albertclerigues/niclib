@@ -11,7 +11,8 @@ niclib is a utility library to ease the development of neuroimaging pipelines us
 This library attempts to offers a simple interface to commonly used functions and procedures when dealing with
 file storage, data operations, data and patch generators, network training, loss functions and evaluation metrics.
 
-This library does't aim to be a complete replacement of other deep learning or neuroimaging libraries.
+This library does't aim to be a complete deep learning framework or serve as full replacement of other deep learning
+or neuroimaging libraries.
 If more advanced functionality is required, we encourage the user to use the provided code as a starting point to
 implement their own needs.
 
@@ -22,7 +23,7 @@ niclib only requirement is Python 3.6, the library can then be installed using p
 
 .. code-block:: none
 
-   pip3 install https://nic.udg.edu/niclib/wheels/niclib-0.5b-py3-none-any.whl
+   pip3 install https://nic.udg.edu/niclib/wheels/niclib-1.0b0-py3-none-any.whl
 
 .. toctree::
    :maxdepth: 2
@@ -38,14 +39,17 @@ niclib only requirement is Python 3.6, the library can then be installed using p
 .. :caption: Contents:
 
 .. toctree::
-    :maxdepth: 2
+    :maxdepth: 1
     :caption: Tutorials and examples
     :glob:
 
     examples/*
 
 
+Contributing
+*******************
 
+Find the repository as well as contributing guide at TBD.
 
 
 Indices and tables

@@ -8,11 +8,11 @@ from abc import ABC
 import torch
 from torch import nn
 
-from ..utils import RemainingTimeEstimator, remove_extension
+from ..utils import RemainingTimeEstimator, remove_extension, get_timestamp, save_to_csv
 
 
 class Trainer:
-    """Class for torch Module training using training and validation generators with basic metric supprt.
+    """Class for torch Module training using training and validation generators with basic metric support.
     It also has support for plugins, a way to embed any functionality in the training procedure.
 
     :param int max_epochs: maximum number of epochs to train. Training can be interrupted with a plugin by setting the
@@ -28,19 +28,6 @@ class Trainer:
 
     Plugins are made by inheriting from the base class :py:class:`~niclib.net.train.TrainerPlugin` and overriding
     the inherited functions to implement the desired functionality at specific points during the training.
-    Runtime variables accesible to the plugins via the input argument `trainer`.
-
-    :var bool keep_training: control flag to continue or interrupt the training. Checked at the start of each epoch.
-    :var torch.nn.Module model: the partially trained model.
-    :var torch.optim.Optimizer model_optimizer: the model optimizer.
-    :var torch.utils.data.DataLoader train_gen:
-    :var torch.utils.data.DataLoader val_gen:
-    :var dict train_metrics:
-    :var dict val_metrics:
-    :var torch.Tensor x:
-    :var torch.Tensor y:
-    :var torch.Tensor y_pred:
-    :var torch.Tensor loss:
     """
 
     def __init__(self, max_epochs, loss_func, optimizer, optimizer_opts=None, train_metrics=None, val_metrics=None, plugins=None, device='cuda', multigpu=False):
@@ -95,7 +82,7 @@ class Trainer:
         :param torch.utils.data.DataLoader train_gen: An iterator returning (x, y) pairs for training.
         :param torch.utils.data.DataLoader val_gen: An iterator returning (x, y) pairs for validation.
         :param dict checkpoint: (optional) checkpoint that can include 'epoch', 'model', 'optimizer' or 'loss'
-        :return torch.nn.Module: the trained model.
+        :return: None, after training you should load the stored model from disk using torch.load()
         """
 
         # Store given arguments in runtime variables to be available to plugins
@@ -136,8 +123,6 @@ class Trainer:
 
         print("Training finished\n")
         [plugin.on_train_end(self) for plugin in self.plugins]
-
-        return self.model
 
     def train_epoch(self):
         self.model.train() # Set the model in training mode (for correct dropout, batchnorm, etc.)
@@ -228,14 +213,48 @@ class TrainerPlugin(ABC):
 
     where:
 
-    :param trainer: :py:class:`Trainer <niclib.net.train.Trainer>` instance that grants access to all its runtime attributes i.e. ``trainer.model``, ``trainer.train_gen``...
+    :param trainer: :py:class:`Trainer <niclib.net.train.Trainer>` instance that grants access to all its runtime variables (i.e. trainer.keep_training):
     :param num_epoch: current epoch number (starting at 0)
     :param batch_idx: current batch iteration (starting at 0)
 
+    The training runtime variables accesible through the trainer object are:
+
+    :var bool keep_training: control flag to continue or interrupt the training. Checked at the start of each epoch.
+    :var torch.nn.Module model: the partially trained model.
+    :var torch.optim.Optimizer model_optimizer: the model optimizer.
+    :var torch.nn.Module loss_func: The loss function object
+    :var torch.utils.data.DataLoader train_gen:
+    :var torch.utils.data.DataLoader val_gen:
+    :var dict train_metrics:
+    :var dict val_metrics:
+    :var torch.Tensor x:
+    :var torch.Tensor y:
+    :var torch.Tensor y_pred:
+    :var torch.Tensor loss:
+
     :Example:
 
-    >>> print('TODO')
-
+    >>> # Here we define a plugin that will segment and compute metrics on test_images at the end of each epoch
+    >>> class EpochEvaluatorPlugin(TrainerPlugin):
+    >>>     def __init__(self, test_images, test_targets):
+    >>>         super().__init__()
+    >>>         self.images, self.targets = test_images, test_targets
+    >>>         self.predictor = niclib.net.test.PatchTester(
+    >>>             patch_shape=(1, 32, 32, 32),
+    >>>             patch_out_shape=(3, 32, 32, 32),
+    >>>             extraction_step=(16, 16, 16),
+    >>>             normalize='image',
+    >>>             activation=torch.nn.Softmax(dim=1))
+    >>>
+    >>>     def on_val_epoch_end(self, trainer, num_epoch):
+    >>>         pred_images = [self.predictor.predict(trainer.model, img) for img in self.images]
+    >>>         pred_metrics = niclib.metrics.compute_metrics(
+    >>>             outputs=[np.argmax(img, axis=0) for img in pred_images],
+    >>>             targets=self.targets,
+    >>>             metrics={
+    >>>                 'dsc': niclib.metrics.dsc,
+    >>>                 'acc': niclib.metrics.accuracy})
+    >>>         niclib.save_to_csv('metrics_epoch{}.csv'.format(num_epoch), pred_metrics)
     """
     def on_init(self, trainer):
         pass
@@ -302,7 +321,7 @@ class ModelCheckpoint(TrainerPlugin):
             if self.mode == 'max':
                 metric_diff *= -1.0
 
-            if  metric_diff > self.min_delta:
+            if metric_diff > self.min_delta:
                 self.best_metric.update(epoch=num_epoch, value=monitored_metric_value)
                 print("Saving best model at {}".format(self.filepath))
                 torch.save(trainer.model, self.filepath)
@@ -321,14 +340,16 @@ class EarlyStopping(TrainerPlugin):
 
     :param filepath: Filepath where the best model will be stored.
     :param str metric_name: monitored metric name. The name has to exist as a key in the val_metrics provided to the :class:`Trainer`.
+    :param str mode: either ``min`` or ``max`` of the monitored metric to stop the training.
     :param int patience: Number of epochs to wait since the last best model before interrupting training.
     :param min_delta: minimum change between metric values to consider a new best model.
     """
 
-    def __init__(self, metric_name, patience, min_delta=1e-5):
+    def __init__(self, metric_name, mode, patience, min_delta=1e-5):
         self.min_delta = min_delta
 
         self.metric_name = metric_name
+        self.mode = mode
         self.patience = patience
 
         # Runtime variables
@@ -339,7 +360,12 @@ class EarlyStopping(TrainerPlugin):
 
     def on_val_epoch_end(self, trainer, num_epoch):
         monitored_metric_value = trainer.val_metrics['val_{}'.format(self.metric_name)]
-        if self.best_metric['value'] - monitored_metric_value > self.min_delta:
+
+        metric_diff = self.best_metric['value'] - monitored_metric_value
+        if self.mode == 'max':
+            metric_diff *= -1.0
+
+        if metric_diff > self.min_delta:
             self.best_metric.update(epoch=num_epoch, value=monitored_metric_value)
 
         # Interrupt training if metric didnt improve in last 'patience' epochs
@@ -408,6 +434,27 @@ class ProgressBar(TrainerPlugin):
         print('\r [{}] {}/{} ({}%) ETA {} - {}'.format(
             bar, batch_num, total_batches, percent, eta, metrics_string), end='')
         sys.stdout.flush()
+
+class Logger(TrainerPlugin):
+    """Plugin that stores the time and average training and validation metrics for each epoch.
+
+    :param str filepath: filepath to store the log as a .csv file.
+    """
+
+    def __init__(self, filepath):
+        self.filepath = filepath
+        self.all_metrics = []
+
+    def on_val_epoch_end(self, trainer, num_epoch):
+        epoch_metrics = {'Epoch': num_epoch, 'Time finished': get_timestamp()}
+        epoch_metrics.update(trainer.train_metrics.items())
+        epoch_metrics.update(trainer.val_metrics.items())
+        self.all_metrics.append(epoch_metrics)
+        save_to_csv(self.filepath, self.all_metrics)
+
+
+
+
 
 
 

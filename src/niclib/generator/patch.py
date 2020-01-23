@@ -20,6 +20,17 @@ class PatchInstruction:
 
 
 class PatchSampling(ABC):
+    """Abstract Base Class that defines a patch sampling strategy.
+
+    A new sampling can be made by inheriting from this class and overriding the abstract method ``sample_centers``.
+
+    .. py:function:: sample_centers(self, images, patch_shape)
+
+        :param List[np.ndarray] images: list of images with shape (CH, X, Y, Z)
+        :param tuple patch_shape: patch shape as (X, Y, Z)
+        :return: (List[List[tuple]]) A list containing a list of centers (tuples as (x, y, z)) for each image in images.
+    """
+
     @abstractmethod
     def sample_centers(self, images, patch_shape):
         pass
@@ -37,15 +48,15 @@ class UniformSampling(PatchSampling):
     """
 
     def __init__(self, step, num_patches=None, masks=None):
-        assert len(step) == 3
+        assert len(step) == 3, 'len({}) != 3'.format(step)
         if num_patches is not None:
-            assert num_patches > 0
+            assert num_patches > 0, 'number of patches must be greater than 0'
         self.step = step
         self.npatches = num_patches
         self.masks = masks
 
     def sample_centers(self, images, patch_shape):
-        assert len(patch_shape) == len(self.step) == 3
+        assert len(patch_shape) == len(self.step) == 3, 'len({}) != 3 or len({}) != 3'.format(patch_shape, self.step)
         assert all(len(img.shape) == 4 for img in images)
         if self.masks is not None:
             assert all(img[0].shape == msk.shape for img, msk in zip(images, self.masks))
@@ -72,8 +83,10 @@ class BalancedSampling(PatchSampling):
         self.exclude_label = exclude_label
 
     def sample_centers(self, images, patch_shape):
-        assert len(images) == len(self.labels)
-        assert all(img[0].shape == lbl.shape for img, lbl in zip(images, self.labels)), '{}, {}'.format(images[0].shape, self.labels[0].shape)
+        assert len(images) == len(self.labels), 'len(images): {} != len(self.labels): {}'.format(
+            len(images), len(self.labels))
+        assert all(img[0].shape == lbl.shape for img, lbl in zip(images, self.labels)), '{}, {}'.format(
+            images[0].shape, self.labels[0].shape)
         patches_per_image = int(np.ceil(self.npatches / len(images)))
 
         # In parallel to speed up computation
@@ -113,7 +126,7 @@ class PatchSet(TorchDataset):
 
     def  __init__(self, images, patch_shape, sampling, normalize, dtype=torch.float, centers=None):
         assert all([img.ndim == 4 for img in images]), 'Images must be numpy ndarrays with dimensions (C, X, Y, Z)'
-        assert len(patch_shape) == 3
+        assert len(patch_shape) == 3, 'len({}) != 3'.format(patch_shape)
         assert normalize in ['none', 'patch', 'image']
         if centers is None: assert isinstance(sampling, PatchSampling)
         if centers is not None: assert len(centers) == len(images)
@@ -204,7 +217,7 @@ def sample_centers_balanced(label_img, patch_shape, num_centers, add_rand_offset
 
     # Resample (repeating or removing) to appropiate number
     centers_labels = \
-        {k: resample_list(v, num_centers / len(label_ids)) for k, v in centers_labels.items()}
+        {k: resample_list(v, num_centers // len(label_ids)) for k, v in centers_labels.items()}
 
     # Add random offset of up to half the patch size
     if add_rand_offset:
@@ -234,6 +247,7 @@ def sample_centers_uniform(vol, patch_shape, extraction_step, max_centers=None, 
     :param mask: (Optional) If given, discard centers not in foreground
     :return:
     """
+
     assert len(vol.shape) == len(patch_shape) == len(extraction_step), '{}, {}, {}'.format(vol.shape, patch_shape, extraction_step)
     if mask is not None:
         assert len(mask.shape) == len(vol.shape), '{}, {}'.format(mask.shape, vol.shape)
