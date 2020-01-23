@@ -1,6 +1,5 @@
 import torch
 import torch.nn.functional as F
-#from snorkel.classification import cross_entropy_with_probs
 from torch import nn
 
 # Import losses
@@ -77,12 +76,13 @@ class Hard2SoftLoss(nn.Module):
             raise ValueError("Keyword 'reduction' must be one of ['none', 'mean', 'sum']")
 
 
-
 def soft_crossentropy_with_logits(output, target):
+    from snorkel.classification import cross_entropy_with_probs
+
     num_ch = output.size(1)
     out_flat = output.transpose(0, 1).contiguous().view(num_ch, -1).transpose(0, 1)
     tgt_flat = target.transpose(0, 1).contiguous().view(num_ch, -1).transpose(0, 1)
-    return Hard2SoftLoss(nn.CrossEntropyLoss())(out_flat, tgt_flat)
+    return cross_entropy_with_probs(out_flat, tgt_flat)
 
 
 # class LovaszSoftmaxLoss(nn.Module):

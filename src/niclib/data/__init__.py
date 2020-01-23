@@ -71,12 +71,13 @@ def get_largest_connected_component(segmentation):
         return segmentation
     return labels == np.argmax(np.bincount(labels.flat)[1:])+1
 
-def pad_to_shape(image, shape, numpy_pad_options=None):
+
+def pad_to_shape(image, new_shape, numpy_pad_options=None):
     """Pads an image to match the given shape where dimensions are padded equally before and after (so that the
     original image is at the center of the padded image).
 
     :param image: image to pad
-    :param tuple shape: target shape of padded image. If given shape has one less dimension than the image,
+    :param tuple new_shape: target shape of padded image. If given shape has one less dimension than the image,
         it is assumed that the first image dimension is the channel dimension and shouldn't be padded.
     :param dict numpy_pad_options: (optional) a dictionary with ``**kwargs`` for the numpy.pad function.
         It defaults to ``{'mode': constant, 'constant_values': 0}``.
@@ -102,12 +103,13 @@ def pad_to_shape(image, shape, numpy_pad_options=None):
      [1. 1. 1.]
      [1. 1. 1.]]
     """
-    if len(image.shape) > len(shape): # Assume image with channel dimension that shouldn't be padded
-        shape = (image.shape[0],) + shape
-    assert len(image.shape) == len(shape)
-    assert all([img_dim <= tgt_dim for img_dim, tgt_dim in zip(image.shape, shape)])
 
-    remaining_shape = np.subtract(shape, image.shape)
+    if len(image.shape) > len(new_shape): # Assume image with channel dimension that shouldn't be padded
+        shape = (image.shape[0],) + new_shape
+    assert len(image.shape) == len(new_shape), 'len({}) != len({})'.format(image.shape, new_shape)
+    assert all([img_dim <= tgt_dim for img_dim, tgt_dim in zip(image.shape, new_shape)])
+
+    remaining_shape = np.subtract(new_shape, image.shape)
     pad_widths = [(int(np.floor(rdim / 2.0)), int(np.ceil(rdim / 2.0))) for rdim in remaining_shape]
     numpy_pad_options = {} if numpy_pad_options is None else numpy_pad_options
     img_padded = np.pad(image, pad_widths, **numpy_pad_options)

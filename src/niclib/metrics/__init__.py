@@ -28,12 +28,21 @@ def compute_metrics(outputs, targets, metrics, ids=None):
 
     :param outputs: list of output images
     :param targets: list of gold standard images
-    :param metrics: dictionary containing each metric as {metric_name: metric_function}
+    :param metrics: dictionary containing each metric as {metric_name: metric_function}, the metric function must have
+        two arguments as ``metric_function(output, target)``.
     :param ids: (Optional) list of image identifiers
     :return: list of dictionaries containing the metrics for each given sample
+
+    :Example:
+
+    >>> outs = [np.asarray([[0, 1, 0, 1]]), np.asarray([[0, 0, 1, 1]])]
+    >>> tgts = [np.asarray([[0, 0, 1, 1]]), np.asarray([[0, 0, 1, 1]])]
+    >>> compute_metrics(outs, tgts, metrics={'dsc': niclib.metrics.dsc, 'acc': niclib.metrics.accuracy})
+    [{'id': '0', 'dsc': 0.5, 'acc': 0.5},
+     {'id': '1', 'dsc': 1.0, 'acc': 1.0}]
     """
-    assert len(outputs) == len(targets)
-    assert isinstance(metrics, dict)
+    assert len(outputs) == len(targets), 'len(outputs):{} != len(targets):{}'.format(len(outputs), len(targets))
+    assert isinstance(metrics, dict), 'Provide metrics as a dictionary containing {metric_name: metric_function}'
 
     all_metrics = []
     for n, (output, target) in enumerate(zip(outputs, targets)):
@@ -104,8 +113,8 @@ def specificity(output, target):
 
 
 def positive_predictive_value(output, target):
-    output, target, was_numpy = _convert_to_torch(output, target)
     """Positive predictive value for binary segmentation."""
+    output, target, was_numpy = _convert_to_torch(output, target)
     tp, fp = _true_positives(output, target), _false_positives(output, target)
     result = tp / (tp + fp + 1e-7)
     return _convert_to_scalar(result, was_numpy)
@@ -136,22 +145,25 @@ def haussdorf_distance(output, target):
 
 
 def dsc(output, target, background_label=0):
-    """Dice Similarity Coefficient"""
+    """Dice Similarity Coefficient. Output and target must contain integer labels."""
     output, target, was_numpy = _convert_to_torch(output, target)
-    assert output.size() == target.size()
+    assert output.size() == target.size(), '{} != {}'.format(output.size(),target.size())
 
     output_mask = (output != background_label).bool()
     target_mask = (target != background_label).bool()
 
     intersection = torch.sum((output == target).bool() * (output_mask + target_mask))
     denominator = torch.sum(output_mask) + torch.sum(target_mask)
-    result = 2.0 * intersection / denominator if denominator > 0 else 0
+
+    result = 2.0 * intersection / denominator if denominator.item() > 0.0 else 0.0 * intersection
 
     return _convert_to_scalar(result, was_numpy)
 
-def accuracy(output, target, class_dim=1):
-    """Accuracy defined as: mean(argmax(output) == argmax(target))"""
-    return torch.mean(torch.eq(torch.argmax(output, dim=class_dim), torch.argmax(target, dim=class_dim)).float())
+def accuracy(output, target):
+    """Accuracy. Output and target must contain integer labels."""
+    output, target, was_numpy = _convert_to_torch(output, target)
+    result = torch.mean(torch.eq(output, target).float())
+    return _convert_to_scalar(result, was_numpy)
 
 
 def mse(output, target, ignore_zeros=False):

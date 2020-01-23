@@ -27,3 +27,4 @@ Patch Generation
 .. autoclass:: PatchSet
 .. autoclass:: UniformSampling
 .. autoclass:: BalancedSampling
+.. autoclass:: PatchSampling

@@ -222,8 +222,12 @@ def resample_list(l, n):
     >>> resample_list([0, 1, 2, 3], n=6)
     [0, 1, 2, 3, 0, 2]
     """
+    assert n == int(n)
+    n = int(n)
+
     if len(l) < n:  # List smaller than n (Repeat elements)
         resampling_idxs = list(range(len(l))) * (n // len(l))  # Full repetitions
+
         if len(resampling_idxs) < n:  # Partial repetitions
             resampling_idxs += np.arange(
                 start=0.0, stop=float(len(l)) - 1.0, step=len(l) / float(n % len(l))).astype(int).tolist()
