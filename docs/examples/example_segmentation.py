@@ -7,7 +7,6 @@ import niclib as nl
 
 ### Relevant paths
 data_path = 'path/to/campinas-mini' # Change this to point to the dataset in your filesystem
-data_path = '/media/user/dades/DATASETS/campinas-mini' # Change this to point to the dataset in your filesystem
 checkpoints_path = nl.make_dir('checkpoints/')
 results_path = nl.make_dir('results/')
 metrics_path = nl.make_dir('metrics/')

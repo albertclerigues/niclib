@@ -49,7 +49,7 @@ niclib only requirement is Python 3.6, the library can then be installed using p
 Contributing
 *******************
 
-Find the repository as well as contributing guide at TBD.
+Find the repository as well as contributing guide at https://github.com/albertclerigues/niclib .
 
 
 Indices and tables
