@@ -98,33 +98,55 @@ def soft_crossentropy_with_logits(output, target):
 #         return lovasz_softmax_flat(out_flat, torch.argmax(tgt_flat, dim=1))
 
 
-# class FocalLoss(nn.Module):
-#     def __init__(self, gamma=2.0, weights=None, with_logits=False):
-#         """Focal loss
-#
-#         TODO implement
-#
-#         :param gamma:
-#         :param list weights: channel-wise loss weights
-#
-#         Usage:
-#         :param output:
-#         :param target:
-#         """
-#         super().__init__()
-#         self.g = gamma
-#         self.w = weights
-#         self.with_logits = with_logits
-#
-#     def forward(self, output, target):
-#         output = torch.clamp(output, min=1E-7, max=1.0 - 1E-7) # numerical stability
-#
-#         log_output = F.log_softmax(pt, dim=1) if self.with_logits else torch.log(pt)
-#         fl = -1.0 * torch.pow(pt, self.g) * log_output
-#
-#         if self.w is not None: # Apply channel-wise weighting
-#             fl = torch.mul(torch.stack([torch.full_like(output[:, 0, ...], w) for w in self.w], dim=1), fl)
-#         return torch.mean(fl)
+class FocalLoss(nn.Module):
+    """Focal loss for multi-class segmentation [Lin2017]_.
+
+    This loss is a difficulty weighted version of the crossentropy loss where more accurate predictions
+    have a diminished loss output.
+
+    :param gamma: the *focusing* parameter (where :math:`\\gamma > 0`). A higher gamma will give less weight to confidently
+        predicted samples.
+    :param list weights: channel-wise weights to multiply before reducing the output.
+
+    .. rubric:: Usage
+
+    :param output: tensor with dimensions :math:`(\\text{BS}, \\text{CH}, \\ast)` containing the output **logits** of the network.
+        :math:`\\text{BS}` is the batch size, :math:`\\text{CH}` the number of channels and :math:`\\ast` can be any
+        number of additional dimensions with any size.
+    :param target: tensor with dimensions :math:`(\\text{BS}, \\ast)` (of type long) containing integer label targets.
+    :param reduce: one of ``'none'``, ``'mean'``, ``'sum'`` (default: ``'mean'``)
+
+    .. rubric:: References
+
+    .. [Lin2017] Lin, Tsung-Yi, et al. "Focal loss for dense object detection." Proceedings of the IEEE international conference on computer vision. 2017. (https://arxiv.org/abs/1708.02002)
+    """
+
+    def __init__(self, gamma=2.0, weights=None, reduce='mean'):
+        super().__init__()
+        assert gamma >= 0.0
+        self.g = gamma
+        self.w = weights
+
+        self.reduce_fns = {'mean': torch.mean, 'sum': torch.sum, 'none': lambda x : x}
+        assert reduce in self.reduce_fns.keys()
+        self.reduce = self.reduce_fns[reduce]
+
+    def forward(self, output, target, reduce=None):
+        pt_mask = torch.stack([target == l for l in torch.arange(output.size(1))], dim=1).float()
+        pt_softmax = torch.sum(nn.functional.softmax(output, dim=1) * pt_mask, dim=1)
+        pt_log_softmax = torch.sum(torch.nn.functional.log_softmax(output, dim=1) * pt_mask, dim=1)
+        fl = -1.0 * torch.pow(torch.sub(1.0, pt_softmax), self.g) * pt_log_softmax
+
+        if self.w is not None:
+            fl *= torch.stack(
+                [self.w[n] *  pt_mask[:, l, ...] for n, l in enumerate(torch.arange(pt_mask.size(1)))], dim=1)
+
+        if reduce is not None:
+            assert reduce in self.reduce_fns.keys()
+            self.reduce = self.reduce_fns[reduce]
+        return self.reduce(fl)
+
+
 #
 #
 # class BinaryFocalLoss(nn.Module):
