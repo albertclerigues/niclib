@@ -178,8 +178,9 @@ class Trainer:
 
 
     def _to_device(self, x, y=None):
+
         if isinstance(x, list) or isinstance(x, tuple):
-            x = [self._to_device(x_i) for x_i in x]
+            x = tuple(self._to_device(x_n) for x_n in x)
         else:
             x = x.to(self.device)
 
@@ -187,11 +188,11 @@ class Trainer:
             return x
 
         if isinstance(y, list) or isinstance(y, tuple):
-            y = [self._to_device(y_i) for y_i in y]
+            y = tuple(self._to_device(y_n) for y_n in y)
         else:
             y = y.to(self.device)
 
-        return x,y
+        return x, y
 
 
 
