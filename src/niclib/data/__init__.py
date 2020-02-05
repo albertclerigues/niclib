@@ -64,12 +64,16 @@ def clip_percentile(img, percentile, ignore_zeros=False):
 
 
 def get_largest_connected_component(segmentation):
-    """Returns only the largest connected component of a binary segmentation."""
+    """Returns the largest connected component of the given binary segmentation.
+
+    :param segmentation: numpy array, either boolean or numerical where 0 is background and 1 foreground.
+    """
+
     labels = measure.label(segmentation) # Get connected components
-    if labels.max() != 0: # assume at least 1 CC
-        warnings.warn(UserWarning, 'Getting largest connected component of empty segmentation')
+    if labels.max() == 0: # assume at least 1 CC
+        warnings.warn('Empty segmentation when getting largest connected component', UserWarning)
         return segmentation
-    return labels == np.argmax(np.bincount(labels.flat)[1:])+1
+    return np.equal(labels, np.argmax(np.bincount(labels.flat)[1:])+1).astype(segmentation.dtype)
 
 
 def pad_to_shape(image, new_shape, numpy_pad_options=None):
