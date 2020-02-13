@@ -28,7 +28,8 @@ def adjust_range(img, new_range, old_range=None):
     if old_range is None:
         old_low, old_high = np.min(img), np.max(img)
         if old_low == old_high:
-            raise ValueError('Given array is of constant value, range cannot be adjusted!')
+            warnings.warn('Found constant value image in adjust_range, returning constant image low range')
+            return np.full_like(img, fill_value=new_range[0])
     else:
         old_low, old_high = float(old_range[0]), float(old_range[1])
 
