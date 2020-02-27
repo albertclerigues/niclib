@@ -289,7 +289,7 @@ def moving_average(l, n):
 
     ret = np.cumsum(l, dtype=float)
     ret[n:] = ret[n:] - ret[:-n]
-    return (ret[n - 1:] / n).to_list()
+    return list(ret[n - 1:] / n)
 
 
 #######################################################################################################################
