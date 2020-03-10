@@ -6,7 +6,9 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset as TorchDataset
 
+import niclib as nl
 import time
+
 
 from ..utils import resample_list, parallel_load
 
@@ -85,8 +87,9 @@ class BalancedSampling(PatchSampling):
     def sample_centers(self, images, patch_shape):
         assert len(images) == len(self.labels), 'len(images): {} != len(self.labels): {}'.format(
             len(images), len(self.labels))
-        assert all(img[0].shape == lbl.shape for img, lbl in zip(images, self.labels)), '{}, {}'.format(
-            images[0].shape, self.labels[0].shape)
+
+        for img, lbl in zip(images, self.labels):
+            assert img[0].shape == lbl.shape , '{}, {}'.format(img[0].shape, lbl.shape)
         patches_per_image = int(np.ceil(self.npatches / len(images)))
 
         # In parallel to speed up computation
@@ -230,7 +233,7 @@ def sample_centers_balanced(label_img, patch_shape, num_centers, add_rand_offset
     for k in centers_labels.keys():
         centers_labels[k] = np.clip(centers_labels[k],
             a_min=np.ceil(np.divide(patch_shape, 2.0)).astype(int),
-            a_max=label_img.shape - np.floor(np.divide(patch_shape, 2.0).astype(int))).astype(int)
+            a_max=label_img.shape - np.ceil(np.divide(patch_shape, 2.0)).astype(int)).astype(int)
 
     # Join the centers of each label and return in appropiate format
     return [tuple(c) for c in np.concatenate(list(centers_labels.values()), axis=0)]
