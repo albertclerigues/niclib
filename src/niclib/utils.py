@@ -169,21 +169,23 @@ def save_nifti(filepath, volume, dtype=None, reference=None, channel_handling='n
     nifti.to_filename(filepath)
 
 
-def save_to_csv(filepath, dict_list):
+def save_to_csv(filepath, dict_list, append=False):
     """Saves a list of dictionaries as a .csv file.
 
     :param str filepath: the output filepath
     :param List[Dict] dict_list: The data to store as a list of dictionaries.
         Each dictionary will correspond to a row of the .csv file with a column for each key in the dictionaries.
+    :param bool append: If True, it will append the contents to an existing file.
 
     :Example:
 
     >>> save_to_csv('data.csv', [{'id': '0', 'score': 0.5}, {'id': '1', 'score': 0.8}])
     """
     assert isinstance(dict_list, list) and all([isinstance(d, dict) for d in dict_list])
-    with open(filepath, mode='w') as f:
+    with open(filepath, mode='a') as f:
         csv_writer = csv.DictWriter(f, dict_list[0].keys(), restval='', extrasaction='raise', dialect='unix')
-        csv_writer.writeheader()
+        if not append:
+            csv_writer.writeheader()
         csv_writer.writerows(dict_list)
 
 
