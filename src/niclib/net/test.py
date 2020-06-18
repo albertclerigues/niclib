@@ -1,4 +1,7 @@
+import copy
+
 import torch
+import numpy as np
 
 from ..utils import print_progress_bar, RemainingTimeEstimator, save_nifti
 from ..generator import make_generator
@@ -43,6 +46,14 @@ class PatchTester:
         """
         assert len(x.shape) == 4, 'Please give image with shape (CH, X, Y, Z)'
 
+        # First pad image to ensure all voxels in volume are processed independently of extraction_step
+        pad_dims = [(0,)] + [(int(np.ceil(in_dim / 2.0)),) for in_dim in self.in_shape[1:]]
+        print(pad_dims)
+
+        x_orig = copy.copy(x)
+        x = np.pad(x, pad_dims, mode='edge')
+        print(x.shape)
+
         # Create patch generator with known patch center locations.
         x_centers = sample_centers_uniform(x[0], self.in_shape[1:], self.extraction_step, mask=mask)
         x_slices = _get_patch_slice(x_centers, self.in_shape[1:])
@@ -71,9 +82,19 @@ class PatchTester:
                     voting_img[patch_slice] += predicted_patch
                     counting_img[patch_slice] += torch.ones_like(predicted_patch)
 
-                print_progress_bar(self.bs * n, self.bs * len(patch_gen), suffix="patches predicted - ETA: {}".format(rta.update(n)))
-            print_progress_bar(self.bs * len(patch_gen), self.bs * len(patch_gen), suffix="patches predicted - ETA: {}".format(rta.elapsed_time()))
+                print_progress_bar(self.bs * n, self.bs * len(patch_gen),
+                                   suffix="patches predicted - ETA: {}".format(rta.update(n)))
+            print_progress_bar(self.bs * len(patch_gen), self.bs * len(patch_gen),
+                               suffix="patches predicted - ETA: {}".format(rta.elapsed_time()))
 
         counting_img[counting_img == 0.0] = 1.0  # Avoid division by 0
         predicted_volume = torch.div(voting_img, counting_img).detach().cpu().numpy()
+
+        # Unpad volume to return to original shape
+        unpad_slice = [slice(None)] + [slice(in_dim[0], x_dim - in_dim[0]) for in_dim, x_dim in
+                                       zip(pad_dims[1:], x.shape[1:])]
+        predicted_volume = predicted_volume[tuple(unpad_slice)]
+
+        assert np.array_equal(x_orig.shape[1:], predicted_volume.shape[1:]), '{} != {}'.format(x_orig.shape,
+                                                                                               predicted_volume.shape)
         return predicted_volume
